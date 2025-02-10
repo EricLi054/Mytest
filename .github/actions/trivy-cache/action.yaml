@@ -1,0 +1,56 @@
+name: Update Trivy Cache
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Setup oras
+      uses: oras-project/setup-oras@v1
+
+    - name: Download and extract the vulnerability DB
+      shell: bash
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/.cache/trivy/db
+        oras pull ghcr.io/aquasecurity/trivy-db:2
+        tar -xzf db.tar.gz -C $GITHUB_WORKSPACE/.cache/trivy/db
+        rm db.tar.gz
+
+    - name: Download and extract the Java DB
+      shell: bash
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/.cache/trivy/java-db
+        oras pull ghcr.io/aquasecurity/trivy-java-db:1
+        tar -xzf javadb.tar.gz -C $GITHUB_WORKSPACE/.cache/trivy/java-db
+        rm javadb.tar.gz
+
+    - name: Cache DBs
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ github.workspace }}/.cache/trivy
+        key: cache-trivy-main-db
+
+    - name: Cache Trivy binary
+      id: trivy-binary-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.trivy/bin
+        key: trivy-binary-v0.56.1-Linux-X64
+
+    - name: Install Trivy binary if cache is missing
+      if: steps.trivy-binary-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p ~/.trivy/bin
+        curl -L https://github.com/aquasecurity/trivy/releases/download/v0.56.1/trivy_0.56.1_Linux-64bit.tar.gz -o /tmp/trivy.tar.gz
+        tar -xzvf /tmp/trivy.tar.gz -C ~/.trivy/bin trivy
+        if [ -f ~/.trivy/bin/trivy ]; then
+          chmod +x ~/.trivy/bin/trivy
+        else
+          echo "Error: Trivy binary not found at ~/.trivy/bin/trivy" >&2
+          exit 0
+        fi
+        rm /tmp/trivy.tar.gz
+
+    - name: Add Trivy to PATH
+      shell: bash
+      run: echo "~/.trivy/bin" >> $GITHUB_PATH

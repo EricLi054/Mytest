@@ -1,0 +1,5 @@
+---
+exclude_paths:
+  - "**/README.md"
+  - "content-scripts/**"
+  - "frontend/next.config.js"

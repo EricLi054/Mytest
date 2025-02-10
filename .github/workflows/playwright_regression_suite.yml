@@ -1,0 +1,102 @@
+name: Execute Regression Suite using Playwright
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL of the target environment to run playwiright tests against
+        required: true
+        default: 'https://ractest.com.au'
+        type: choice
+        options:
+          - 'https://ractest.com.au'
+          - 'https://cdvnets.ractest.com.au'
+      test_files:
+        description: Comma-separated list of test files to run (e.g., 'edgeScenariosTests.spec.ts,contactDetailsPage.spec.ts,landingPage.spec.ts')
+        required: true
+        default: 'edgeScenariosTests.spec.ts,contactDetailsPage.spec.ts,landingPage.spec.ts'
+
+jobs:
+  test-automation:
+    timeout-minutes: 30
+    if: startsWith(github.head_ref, 'hotfix/') || startsWith(github.head_ref, 'release/')
+    runs-on: rac-npe-ubuntu-latest
+
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@v4
+
+      - name: Set timezone to Australia/Perth
+        run: sudo timedatectl set-timezone Australia/Perth
+
+      - name: Set test files
+        run: |
+          TEST_FILES=$(echo '${{ inputs.test_files }}' | tr ',' '\n' | sed 's|^|./frontend/__tests__/e2e/|' | tr '\n' ' ')
+          echo "TEST_FILES=$TEST_FILES" >> $GITHUB_ENV
+          echo "Selected test files: $TEST_FILES"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Azure Login
+        uses: Azure/login@v1.1
+        with:
+          allow-no-subscriptions: true
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Fetch secrets from Azure Key Vault and create .env file
+        run: |
+          echo "PLAYWRIGHT_BASE_URL=${{ inputs.url }}" >> .env
+          echo "PLAYWRIGHT_BLUE_MEMBER=rac_playwright_automation_1@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_BLUE_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-1 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_BRONZE_MEMBER=rac_playwright_automation_2@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_BRONZE_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-2 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_RED_MEMBER=rac_playwright_automation_3@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_RED_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-3 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_STAFF_MEMBER=rac_playwright_automation_4@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_STAFF_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-4 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_IGNITE_MEMBER=rac_playwright_automation_5@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_IGNITE_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-5 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_PET_INS_MEMBER=rac_playwright_automation_6@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_PET_INS_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-6 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_FIN_LOAN_MEMBER=rac_playwright_automation_7@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_FIN_LOAN_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-7 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_DEFAULT_USERNAME=rac_playwright_automation_8@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_DEFAULT_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-8 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_CRMID_NOTFOUND=rac_playwright_automation_9@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_CRMID_NOTFOUND_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-9 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_MEMBER_MOBILE_ONLY=rac_playwright_automation_10@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_MEMBER_MOBILE_ONLY_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-10 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_MEMBER_LANDLINE_ONLY=rac_playwright_automation_11@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_MEMBER_LANDLINE_ONLY_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-11 --query value -o tsv)" >> .env
+          echo "PLAYWRIGHT_MEMBER_NO_PHONE=rac_playwright_automation_12@xxofceaa.mailosaur.net" >> .env
+          echo "PLAYWRIGHT_MEMBER_NO_PHONE_PASSWORD=$(az keyvault secret show --vault-name next-rac-vault-uat --name playwright-automation-account-12 --query value -o tsv)" >> .env
+          echo "MAILOSAUR_API_KEY=$(az keyvault secret show --vault-name next-rac-vault-uat --name mailosaur-api-key --query value -o tsv)" >> .env
+          echo "MAILOSAUR_SERVER_ID=$(az keyvault secret show --vault-name next-rac-vault-uat --name mailosaur-server-id --query value -o tsv)" >> .env
+          echo "MAILOSAUR_SMS_NUMBER=$(az keyvault secret show --vault-name next-rac-vault-uat --name mailosaur-sms-number --query value -o tsv)" >> .env
+
+      - name: Install dotenv
+        run: pnpm install dotenv@v16.4.5
+
+      - name: Install Mailosaur
+        run: pnpm install mailosaur@v8.6.1
+
+      - name: Install Playwright
+        run: pnpm install @playwright/test@v1.45.1
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      # Run the playwright tests, note this execution is purely for the regression suite as stipulated by the paths below
+      - name: Run Playwright tests
+        run: npx playwright test --config ./frontend/__tests__/config/playwright.config.ts $TEST_FILES
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: ./frontend/__tests__/playwright-report
+          retention-days: 30

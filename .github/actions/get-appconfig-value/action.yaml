@@ -1,0 +1,40 @@
+name: Get AppConfig Value
+
+inputs:
+  appconfig_endpoint:
+    required: true
+    type: string
+  config_key:
+    required: true
+    type: string
+  perform_azure_login:
+    required: false
+    default: false
+    type: boolean
+
+outputs:
+  value:
+    description: "Config Value"
+    value: ${{ steps.getValue.outputs.value }}
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Azure Login
+      if: inputs.perform_azure_login == 'true'
+      uses: Azure/login@v1.1
+      with:
+        allow-no-subscriptions: true
+        creds: ${{ env.AZURE_CREDENTIALS }}
+
+    - name: Get Value
+      id: getValue
+      uses: azure/CLI@v1
+      with:
+        azcliversion: 2.51.0
+        inlineScript: |
+          field_value=$(az appconfig kv list --endpoint ${{ inputs.appconfig_endpoint }} --auth-mode login --fields value --key ${{ inputs.config_key }} --output tsv)
+          echo "value=$field_value" >> "$GITHUB_OUTPUT"
+
+

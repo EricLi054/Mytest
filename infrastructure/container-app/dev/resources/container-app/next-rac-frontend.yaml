@@ -1,0 +1,148 @@
+next-rac-frontend:
+  # prInstanceSlot: slot01
+  resourceGroupName: rg-next-rac-com-au-dev
+  # location: Australia East
+  managedEnvironmentName: next-rac-env-dev
+  keyVaultName: next-rac-vault-dev
+  appConfigName: next-rac-appconfig-dev
+  appInsightsName: next-rac-app-insights-dev
+  tags: {}
+  properties:
+    # workloadProfileName: Profile01
+    configuration:
+      secrets:
+      - name: adb2c-client-secret
+      - name: adb2c-nextauth-secret
+      - name: aes-key
+      - name: hash-key
+      environmentVariables:
+      - name: CACHE_MAX_AGE
+        configKey: cache-absolute-expiration-seconds
+      - name: AZURE_AD_B2C_TENANT_ID
+        configKey: adb2c-tenant-id
+      - name: AZURE_AD_B2C_CLIENT_ID
+        configKey: adb2c-client-id
+      - name: AZURE_AD_B2C_CUSTOM_URL
+        configKey: adb2c-custom-url
+      - name: AZURE_AD_B2C_PRIMARY_USER_FLOW
+        configKey: adb2c-primary-user-flow
+      - name: AZURE_AD_B2C_EMAIL_UPDATE_FLOW
+        configKey: adb2c-email-update-flow
+      - name: AZURE_AD_B2C_PASSWORD_UPDATE_FLOW
+        configKey: adb2c-password-update-flow
+      - name: GTM_ID
+        configKey: gtm-id
+      - name: VWO_ACCOUNT_ID
+        configKey: vwo-account-id
+      - name: CONTENTFUL_ENVIRONMENT
+        configKey: contentful-environment
+      - name: INSURANCE_B2C_URL
+        configKey: insurance-b2c-url
+      activeRevisionsMode: Single
+      ingress:
+        # fqdn: next-rac-frontend.lemonhill-0b0eaee3.australiaeast.azurecontainerapps.io
+        external: true
+        targetPort: 3000
+        # exposedPort: 0
+        # transport: Auto
+        traffic:
+        - weight: 100
+          latestRevision: true
+        customDomains:
+        - name: next-rac-frontend-dev.ractest.com.au
+          certificateBindingType: Disabled # or SniEnabled
+          certificateName: ractest-wildcard-2024
+        # allowInsecure: false
+        ipSecurityRestrictions: []
+        # - name: IPRestriction0
+        #   description: Allowed IP Address
+        #   ipAddressRange: 103.68.204.0/24
+        #   action: Allow
+        # corsPolicy: 
+        # clientCertificateMode: 
+        # stickySessions: 
+        # additionalPortMappings: 
+        # targetPortHttpScheme: 
+      registries:
+      - server: racwa.azurecr.io
+        username: ""
+        passwordSecretRef: ""
+        identity: /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe
+      dapr:
+        enabled: true
+        appId: frontend
+        appProtocol: http
+        appPort: 3000
+        # httpReadBufferSize: 
+        # httpMaxRequestSize: 
+        # logLevel: info
+        # enableApiLogging: false
+      # maxInactiveRevisions: 
+      # service: 
+    template:
+      revisionSuffix: ""
+      terminationGracePeriodSeconds: 
+      containers:
+      - image: racwa.azurecr.io/next-rac-com-au/next-rac-frontend
+        name: frontend
+        env:
+        - name: BACKEND_APP_ID
+          value: backend
+        - name: NEXTAUTH_SECRET
+          secretRef: adb2c-nextauth-secret
+        - name: AZURE_AD_B2C_CLIENT_SECRET
+          secretRef: adb2c-client-secret
+        - name: AES_KEY
+          secretRef: aes-key
+        - name: HASH_KEY
+          secretRef: hash-key
+        - name: NEXTAUTH_URL
+          value: https://cdvnetd.ractest.com.au/
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+          ephemeralStorage: 1Gi
+        probes:
+        - type: Liveness
+          failureThreshold: 10
+          httpGet:
+            path: /api/healthz/liveness
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          timeoutSeconds: 1
+        - type: Readiness
+          failureThreshold: 10
+          httpGet:
+            path: /api/healthz/readiness
+            port: 3000
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 3
+          timeoutSeconds: 1
+        - type: Startup
+          failureThreshold: 3
+          httpGet:
+            path: /api/healthz/startup
+            port: 3000
+            scheme: HTTP
+          periodSeconds: 10
+          timeoutSeconds: 1
+      initContainers: 
+      scale:
+        minReplicas: 1
+        maxReplicas: 2
+        rules:
+        - name: http-scaler
+          http:
+            metadata:
+              concurrentRequests: 100
+    #   volumes: []
+    #   serviceBinds: 
+    # eventStreamEndpoint: https://australiaeast.azurecontainerapps.dev/subscriptions/f1addffb-2fc0-4b2a-a5f3-a4a1038afa33/resourceGroups/next-rac-com-au-npe/containerApps/next-rac-frontend/eventstream
+    # delegatedIdentities: []
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+      - /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe

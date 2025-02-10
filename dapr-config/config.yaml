@@ -1,0 +1,10 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: daprConfig
+spec:
+  nameResolution:
+    component: "sqlite"
+    version: "v1"
+    configuration:
+      connectionString: "C:\\Users\\Public\\nr.db"

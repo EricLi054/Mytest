@@ -1,0 +1,81 @@
+name: Remove Orphaned feature branch resources (NPE)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name_to_remove:
+        description: 'Warning, this will remove the feature branch provisioned resources. Branch name must start with "feature/"'
+        default: ''
+        required: true
+        type: string
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: f1addffb-2fc0-4b2a-a5f3-a4a1038afa33 # NPE 3
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  container_registry_name: racwanpe
+  TF_VAR_frontend_image: 'racwanpe.azurecr.io/next-rac-frontend-${{ inputs.branch_name_to_remove }}:${{ github.sha }}'
+  TF_VAR_backend_image: 'racwanpe.azurecr.io/next-rac-backend-${{ inputs.branch_name_to_remove }}:${{ github.sha }}'
+  TF_VAR_branch: ${{ inputs.branch_name_to_remove }}
+  tf_dir: ./infrastructure/npe
+  tf_backend_subscription_id: f1addffb-2fc0-4b2a-a5f3-a4a1038afa33 # NPE 3
+  tf_backend_resource_group: next-rac-com-au-npe
+  tf_backend_storage_account: nextractfstate
+  tf_backend_container: terraform-storage
+  tf_backend_key: 'next-rac-npe-${{ inputs.branch_name_to_remove }}.tfstate'
+
+
+jobs:
+  versioning:
+    name: Update Version
+    runs-on: ubuntu-latest
+    outputs:
+      semVer: ${{ steps.gitversion.outputs.semVer }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/bump-version
+        id: gitversion
+        
+  remove_orphan:
+    if: inputs.branch_name_to_remove != '' && startsWith(inputs.branch_name_to_remove, 'feature/')
+    runs-on: ubuntu-latest
+    name: Cleanup Resources
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v2
+
+      - name: Azure Login
+        uses: Azure/login@v1.1
+        with:
+          allow-no-subscriptions: true
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Terraform Init
+        run: terraform -chdir='${{ env.tf_dir }}' init -backend-config="subscription_id=${{ env.tf_backend_subscription_id }}" -backend-config="resource_group_name=${{ env.tf_backend_resource_group }}" -backend-config="storage_account_name=${{ env.tf_backend_storage_account }}" -backend-config="container_name=${{ env.tf_backend_container }}" -backend-config="key=${{ env.tf_backend_key }}"
+
+      - name: Terraform Destroy
+        run: terraform -chdir='${{ env.tf_dir }}' destroy -input=false -auto-approve
+
+      # Service principal needs Storage Blob Data Contributor role to delete state files
+      - name: Delete state file
+        uses: azure/CLI@v1
+        with:
+          azcliversion: 2.50.0
+          inlineScript: |
+            az storage blob delete --account-name ${{ env.tf_backend_storage_account }} --container-name ${{ env.tf_backend_container }} --name ${{ env.tf_backend_key }} --auth-mode login
+      
+      - name: Set lowercase env var for az cli
+        run: |
+          BRANCH=${{ inputs.branch_name_to_remove }}
+          echo "BRANCH=${BRANCH,,}" >> ${GITHUB_ENV}
+
+      # - name: Delete container images
+      - name: Delete container repositories file
+        uses: azure/CLI@v1
+        with:
+          azcliversion: 2.50.0
+          inlineScript: |
+            az acr repository delete --name ${{ env.container_registry_name }} --repository next-rac-backend-${{ env.BRANCH }} --yes
+            az acr repository delete --name ${{ env.container_registry_name }} --repository next-rac-frontend-${{ env.BRANCH }} --yes

@@ -1,0 +1,276 @@
+name: Build-Scan-Patch-Deploy Container
+
+# Build backend and frontend containers on pull requests
+# Pushes containers to dev/sit/uat on merge
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+      - "release/**"
+      - "hotfix/**"
+    paths:
+      - '**'
+      # exclude static
+      - '!.github/workflows/infrastructure_static_*.yaml'
+      - '!infrastructure/static/**'
+      - '!infrastructure/modules/container-app-environment/**'
+      # exclude app gateway
+      - '!.github/workflows/app_gateway_*.yaml'
+      - '!infrastructure/application_gateway/**'
+      - '!infrastructure/modules/terraform-azure-app-gateway/**'
+      # exclude on-demand instances
+      - '!infrastructure/container-app/od01/**'
+      - '!infrastructure/container-app/od02/**'
+      - '!.github/workflows/deployContainer_od*.yaml'
+  push:
+    branches:
+      - main
+      - "release/**"
+      - "hotfix/**"
+    paths:
+      - '**'
+      # exclude static
+      - '!.github/workflows/infrastructure_static_*.yaml'
+      - '!infrastructure/static/**'
+      - '!infrastructure/modules/container-app-environment/**'
+      # exclude app gateway
+      - '!.github/workflows/app_gateway_*.yaml'
+      - '!infrastructure/application_gateway/**'
+      - '!infrastructure/modules/terraform-azure-app-gateway/**'
+      # exclude on-demand instances
+      - '!infrastructure/container-app/od01/**'
+      - '!infrastructure/container-app/od02/**'
+      - '!.github/workflows/deployContainer_od*.yaml'
+env:
+  container_registry_login_server: racwa.azurecr.io
+  container_registry_path: next-rac-com-au
+  frontend_image_name: next-rac-frontend
+  backend_image_name: next-rac-backend
+  acr_keyvault_name: acr-racwa
+  acr_token_secret_name: next-rac-com-au-write-access
+  app_config_endpoint: https://next-rac-appconfig-sit.azconfig.io
+
+jobs:
+  versioning:
+    name: Update Version
+    runs-on: ubuntu-latest
+    outputs:
+      semVer: ${{ steps.gitversion.outputs.semVer }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/bump-version
+        id: gitversion
+
+  backend_container:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+    name: Build-Scan-Patch-Push Backend Container
+    needs: versioning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.container_registry_login_server }}
+          acr_keyvault_name: ${{ env.acr_keyvault_name }}
+          acr_token_secret_name: ${{ env.acr_token_secret_name }}
+          image_name: ${{ env.container_registry_path }}/${{ env.backend_image_name }}
+          image_tag: ${{ github.ref == 'refs/heads/main' && 'latest' || '' }}
+          version_tag: ${{ needs.versioning.outputs.semVer }}
+          docker_context: ./backend/DigitalPlatform.API
+          dockerfile_path: ./backend/DigitalPlatform.API/Dockerfile
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          AZURE_NPM_TOKEN: ${{ secrets.AZURE_NPM_TOKEN }}
+
+  frontend_container:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+    name: Build-Scan-Patch-Push Frontend Container
+    needs: versioning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Azure Login
+        uses: Azure/login@v1.1
+        with:
+          allow-no-subscriptions: true
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - uses: ./.github/actions/get-appconfig-value
+        id: cloudinary_name
+        with:
+          appconfig_endpoint: ${{ env.app_config_endpoint }}
+          config_key: cloudinary-space
+      - uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.container_registry_login_server }}
+          acr_keyvault_name: ${{ env.acr_keyvault_name }}
+          acr_token_secret_name: ${{ env.acr_token_secret_name }}
+          image_name: ${{ env.container_registry_path }}/${{ env.frontend_image_name }}
+          image_tag: ${{ github.ref == 'refs/heads/main' && 'latest' || '' }}
+          version_tag: ${{ needs.versioning.outputs.semVer }}
+          docker_build_args: |
+            CLOUDINARY_NAME=${{ steps.cloudinary_name.outputs.value }}
+          docker_context: ./frontend
+          dockerfile_path: ./frontend/Dockerfile.ci
+          generate_design_system_npmrc: true
+          prefetch_node_modules: true
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          AZURE_NPM_TOKEN: ${{ secrets.AZURE_NPM_TOKEN }}
+
+  deploy_dev:
+    name: Deploy Infrastructure DEV
+    needs: [versioning, backend_container, frontend_container]
+    uses: ./.github/workflows/deploy_terraform_cloud_workflow.yaml
+    with:
+      arm_subscription_id: 4b737f05-03e2-4b5a-88a4-aa8264a39bed # digital-npe
+      blast_radius_calculation: true
+      i_like_fun: true
+      use_saved_plan: true
+      compare_plan: true
+      apply_empty_plan: false
+      # tf_skip_apply: ${{ github.event_name == 'pull_request' }}
+      tf_apply_environment: dev
+      tf_dir: infrastructure/container-app/dev/
+      tf_backend_key: "infrastructure_container_app_dev.tfstate"
+      tf_options_plan: -input=false -var="image_version=${{ needs.versioning.outputs.semVer }}"
+      tf_options_apply: -input=false -auto-approve
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+  deploy_dev_prinstance:
+    name: Deploy DEV PR Instance
+    needs: [versioning, backend_container, frontend_container]
+    uses: ./.github/workflows/deploy_terraform_cloud_workflow.yaml
+    with:
+      arm_subscription_id: 4b737f05-03e2-4b5a-88a4-aa8264a39bed # digital-npe
+      blast_radius_calculation: true
+      i_like_fun: true
+      use_saved_plan: true
+      compare_plan: true
+      apply_empty_plan: false
+      # tf_skip_apply: ${{ github.event_name == 'pull_request' }}
+      tf_apply_environment: dev
+      tf_dir: infrastructure/container-app/dev/
+      tf_backend_key: "infrastructure_container_app_dev_slot_pr${{ github.event.pull_request.number }}.tfstate"
+      tf_options_plan: -input=false -var="image_version=${{ needs.versioning.outputs.semVer }}" -var="pr_instance=true"
+      tf_options_apply: -input=false -auto-approve
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+  deploy_sit:
+    name: Deploy Infrastructure (SIT)
+    needs: [versioning, backend_container, frontend_container]
+    uses: ./.github/workflows/deploy_terraform_cloud_workflow.yaml
+    with:
+      arm_subscription_id: 4b737f05-03e2-4b5a-88a4-aa8264a39bed # digital-npe
+      blast_radius_calculation: true
+      i_like_fun: true
+      use_saved_plan: true
+      compare_plan: true
+      apply_empty_plan: false
+      tf_skip_apply: ${{ github.event_name == 'pull_request' }}
+      tf_apply_environment: sit
+      tf_dir: infrastructure/container-app/sit/
+      tf_backend_key: "infrastructure_container_app_sit.tfstate"
+      tf_options_plan: -input=false -var="image_version=${{ needs.versioning.outputs.semVer }}"
+      tf_options_apply: -input=false -auto-approve
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+  deploy_sit_prinstance:
+    name: Deploy SIT PR Instance
+    needs: [versioning, backend_container, frontend_container]
+    uses: ./.github/workflows/deploy_terraform_cloud_workflow.yaml
+    with:
+      arm_subscription_id: 4b737f05-03e2-4b5a-88a4-aa8264a39bed # digital-npe
+      blast_radius_calculation: true
+      i_like_fun: true
+      use_saved_plan: true
+      compare_plan: true
+      apply_empty_plan: false
+      # tf_skip_apply: ${{ github.event_name == 'pull_request' }}
+      tf_apply_environment: sit
+      tf_dir: infrastructure/container-app/sit/
+      tf_backend_key: "infrastructure_container_app_sit_slot_pr${{ github.event.pull_request.number }}.tfstate"
+      tf_options_plan: -input=false -var="image_version=${{ needs.versioning.outputs.semVer }}" -var="pr_instance=true"
+      tf_options_apply: -input=false -auto-approve
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+  deploy_uat:
+    name: Deploy Infrastructure (UAT)
+    if: ${{ github.ref == 'refs/heads/main' || contains(github.ref, 'refs/heads/release/') || contains(github.ref, 'refs/heads/hotfix/') }}
+    needs: [versioning, backend_container, frontend_container]
+    uses: ./.github/workflows/deploy_terraform_cloud_workflow.yaml
+    with:
+      arm_subscription_id: 4b737f05-03e2-4b5a-88a4-aa8264a39bed # digital-npe
+      blast_radius_calculation: true
+      i_like_fun: true
+      use_saved_plan: true
+      compare_plan: true
+      apply_empty_plan: false
+      tf_skip_apply: ${{ github.event_name == 'pull_request' }}
+      tf_apply_environment: uat
+      tf_dir: infrastructure/container-app/uat/
+      tf_backend_key: "infrastructure_container_app_uat.tfstate"
+      tf_options_plan: -input=false -var="image_version=${{ needs.versioning.outputs.semVer }}"
+      tf_options_apply: -input=false -auto-approve
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+  deploy_prd:
+    name: Deploy Infrastructure (PRD)
+    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: [versioning, backend_container, frontend_container, deploy_uat]
+    uses: ./.github/workflows/deploy_terraform_cloud_workflow.yaml
+    with:
+      arm_subscription_id: bc8c0622-7aa0-4a8b-8e07-9222ea6b0f02 # digital-prd
+      blast_radius_calculation: true
+      i_like_fun: true
+      use_saved_plan: true
+      compare_plan: true
+      apply_empty_plan: false
+      tf_skip_apply: ${{ github.event_name == 'pull_request' }}
+      tf_apply_environment: prd
+      tf_dir: infrastructure/container-app/prd/
+      tf_backend_key: "infrastructure_container_app_prd.tfstate"
+      tf_options_plan: -input=false -var="image_version=${{ needs.versioning.outputs.semVer }}"
+      tf_options_apply: -input=false -auto-approve
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}

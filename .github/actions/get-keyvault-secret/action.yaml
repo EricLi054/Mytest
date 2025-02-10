@@ -1,0 +1,43 @@
+name: Get Keyvault Secret
+
+# Would be good to get this to accept multiple secrets as input instead of 1 at a time
+
+inputs:
+  keyvault_name:
+    required: true
+    type: string
+  secret_name:
+    required: true
+    type: string
+  perform_azure_login:
+    required: false
+    default: false
+    type: boolean
+
+outputs:
+  secret:
+    description: "Secret Value"
+    value: ${{ steps.getSecret.outputs.secret }}
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Azure Login
+      if: inputs.perform_azure_login == 'true'
+      uses: Azure/login@v1.1
+      with:
+        allow-no-subscriptions: true
+        creds: ${{ env.AZURE_CREDENTIALS }}
+
+    - name: Get Secret
+      id: getSecret
+      uses: azure/CLI@v1
+      with:
+        azcliversion: 2.51.0
+        inlineScript: |
+          value=$(az keyvault secret show --name ${{ inputs.secret_name }} --vault-name ${{ inputs.keyvault_name }} --query value --output tsv)
+          echo "::add-mask::$value"
+          echo "secret=$value" >> "$GITHUB_OUTPUT"
+
+

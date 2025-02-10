@@ -1,0 +1,112 @@
+next-rac-backend:
+  resourceGroupName: rg-next-rac-com-au-uat
+  # location: Australia East
+  managedEnvironmentName: next-rac-env-uat
+  keyVaultName: next-rac-vault-uat
+  appConfigName: next-rac-appconfig-uat
+  appInsightsName: next-rac-app-insights-uat
+  tags: {}
+  properties:
+    workloadProfileName: Profile01
+    configuration:
+      secrets: {}
+      environmentVariables: {}
+      activeRevisionsMode: Single
+      ingress:
+        # fqdn: next-rac-backend.internal.lemonhill-0b0eaee3.australiaeast.azurecontainerapps.io
+        external: false
+        targetPort: 8080
+        # exposedPort: 0
+        # transport: Auto
+        traffic:
+        - weight: 100
+          latestRevision: true
+        customDomains: []
+        # allowInsecure: false
+        ipSecurityRestrictions: []
+        # - name: IPRestriction0
+        #   description: Allowed IP Address
+        #   ipAddressRange: 103.68.204.0/24
+        #   action: Allow
+        # corsPolicy: 
+        # clientCertificateMode: 
+        # stickySessions: 
+        # additionalPortMappings: 
+        # targetPortHttpScheme: 
+      registries:
+      - server: racwa.azurecr.io
+        username: ""
+        passwordSecretRef: ""
+        identity: /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe
+      dapr:
+        enabled: true
+        appId: backend
+        appProtocol: http
+        appPort: 8080
+        # httpReadBufferSize: 
+        # httpMaxRequestSize: 
+        # logLevel: info
+        # enableApiLogging: false
+      # maxInactiveRevisions: 
+      # service: 
+    template:
+      revisionSuffix: ""
+      terminationGracePeriodSeconds: 
+      containers:
+      - image: racwa.azurecr.io/next-rac-com-au/next-rac-backend
+        name: backend
+        env:
+        - name: SECRET_STORE
+          value: keyvault
+        - name: CONFIG_STORE
+          value: appconfig
+        - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+          secretRef: app-insights-connection-string
+        resources:
+          cpu: 1
+          memory: 2Gi
+          ephemeralStorage: 4Gi
+        probes:
+        - type: Liveness
+          failureThreshold: 10
+          httpGet:
+            path: /healthz/liveness
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          timeoutSeconds: 1
+        - type: Readiness
+          failureThreshold: 10
+          httpGet:
+            path: /healthz/readiness
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 3
+          timeoutSeconds: 1
+        - type: Startup
+          failureThreshold: 3
+          httpGet:
+            path: /healthz/startup
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 10
+          timeoutSeconds: 1
+      # initContainers: 
+      scale:
+        minReplicas: 2
+        maxReplicas: 4
+        rules:
+        - name: http-scaler
+          http:
+            metadata:
+              concurrentRequests: 700
+      # volumes: []
+    #   serviceBinds: 
+    # eventStreamEndpoint: https://australiaeast.azurecontainerapps.uat/subscriptions/f1addffb-2fc0-4b2a-a5f3-a4a1038afa33/resourceGroups/next-rac-com-au-npe/containerApps/next-rac-backend/eventstream
+    # delegatedIdentities: []
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+      - /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe

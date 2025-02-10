@@ -1,0 +1,33 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": ".NET Core Attach",
+            "type": "coreclr",
+            "request": "attach",
+            "processName": "DigitalPlatform.API.exe",
+            "linux": {
+                "processName": "DigitalPlatform.API"
+            }
+        },
+        {
+            "name": ".NET Core Attach Test",
+            "type": "coreclr",
+            "request": "attach",
+            "processName": "testhost.exe",
+            "linux": {
+                "processName": "testhost"
+            }
+        },
+        {
+            "name": "Next.js: server debug with dapr",
+            "type": "node-terminal",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/frontend",
+            "command": "dapr run --app-id frontend --app-port 3000 --resources-path ../dapr-components --dapr-http-port 3501 -- pnpm dev"
+        }
+    ]
+}

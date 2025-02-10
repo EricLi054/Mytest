@@ -1,0 +1,294 @@
+name: Build Scan Patch Push Container
+
+# Service principal needs AcrPush access to Container Registry
+
+inputs:
+  registry_login_server:
+    required: true
+    type: string
+  image_name:
+    required: true
+    type: string
+  image_tag:
+    required: true
+    type: string
+  version_tag:
+    required: true
+    type: string    
+  docker_build_args:
+    required: false
+    default: ""
+    type: string
+  docker_context:
+    required: false
+    default: .
+    type: string
+  dockerfile_path:
+    required: false
+    default: ./Dockerfile
+    type: string
+  generate_design_system_npmrc:
+    required: false
+    default: false
+    type: boolean
+  prefetch_node_modules:
+    required: false
+    default: false
+    type: boolean
+  acr_keyvault_name:
+    required: false
+    default: ""
+    type: string
+  acr_token_secret_name:
+    required: false
+    default: ""
+    type: string
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Azure Login
+      uses: Azure/login@v1.1
+      with:
+        allow-no-subscriptions: true
+        creds: ${{ env.AZURE_CREDENTIALS }}
+
+    - name: Get ACR Token
+      id: getTokenACR
+      if: inputs.acr_token_secret_name != ''
+      uses: ./.github/actions/get-keyvault-secret
+      with:
+        keyvault_name: ${{ inputs.acr_keyvault_name }}
+        secret_name: ${{ inputs.acr_token_secret_name }}-1
+
+    - name: Set up .npmrc file
+      if: inputs.generate_design_system_npmrc == 'true'
+      shell: bash
+      run: |
+        echo "//racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/:username=racwa
+        //racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/:_password=${{ env.AZURE_NPM_TOKEN }}
+        //racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/:username=racwa
+        //racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/:_password=${{ env.AZURE_NPM_TOKEN }}
+        @racwa:registry=https://racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/
+        always-auth=true" > ${{ inputs.docker_context }}/.npmrc
+
+    - name: Prefetch Node Modules
+      if: inputs.prefetch_node_modules == 'true'
+      uses: ./.github/actions/prefetch-pnpm
+      with:
+        working_dir: ${{ inputs.docker_context }}
+
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ inputs.registry_login_server }}/${{ inputs.image_name }}
+        tags: ${{ inputs.image_tag }}
+
+    - name: "ACR Login"
+      id: acrLogin
+      if: inputs.acr_token_secret_name == ''
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ inputs.registry_login_server }}
+        username: ${{env.AZURE_CLIENT_ID}}
+        password: ${{env.AZURE_CLIENT_SECRET}}
+
+    - name: "ACR Login with token"
+      id: acrLoginToken
+      if: inputs.acr_token_secret_name != ''
+      shell: bash
+      run: |
+        az acr login --name ${{ inputs.registry_login_server }} --username ${{ inputs.acr_token_secret_name }} --password ${{ steps.getTokenACR.outputs.secret }}
+
+    - name: Set up docker in containerd mode
+      uses: docker/setup-docker-action@v4
+      with:
+        daemon-config: |
+          {
+            "features": {
+              "containerd-snapshotter": true
+            }
+          }
+    - name: Get socket path
+      shell: bash
+      run: |
+        url=$(docker context inspect | jq -r .[0].Endpoints.docker.Host)
+        socket_path=$(echo "$url" | awk -F// '{print $2}')
+        echo "$socket_path"
+        echo "SOCKET=$socket_path" >> $GITHUB_ENV
+
+    - name: Build the image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        load: true
+        push: false
+        context: ${{ inputs.docker_context }}
+        file: ${{ inputs.dockerfile_path }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: ${{ inputs.docker_build_args }}
+
+    - name: pack build to tarball for trivy scan
+      shell: bash
+      run: |
+        docker save -o build.tar ${{ steps.meta.outputs.tags }}
+
+    - name: Restore Trivy DB
+      id: restoreTrivy
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/.cache/trivy
+        key: cache-trivy-main-db
+        restore-keys: |
+          cache-trivy-main-db
+
+    - name: Get Trivy DB if not found
+      if: steps.restoreTrivy.outputs.cache-hit != 'true'
+      uses: ./.github/actions/trivy-cache
+
+    - name: Trivy scan output table
+      if: ${{ always() && steps.build.conclusion == 'success' }}
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        input: ${{ github.workspace }}/build.tar
+        scan-type: "image"
+        format: "table"
+        ignore-unfixed: true
+        vuln-type: "os"
+        severity: "CRITICAL,HIGH"
+        scanners: "vuln"
+      env:
+        TRIVY_SKIP_DB_UPDATE: true
+        TRIVY_SKIP_JAVA_DB_UPDATE: true
+        TRIVY_DISABLE_VEX_NOTICE: true
+
+    - name: Trivy scan output json
+      if: ${{ always() && steps.build.conclusion == 'success' }}
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        input: ${{ github.workspace }}/build.tar
+        scan-type: "image"
+        format: "json"
+        output: "report.json"
+        ignore-unfixed: true
+        vuln-type: "os"
+        severity: "CRITICAL,HIGH"
+        scanners: "vuln"
+      env:
+        TRIVY_SKIP_DB_UPDATE: true
+        TRIVY_SKIP_JAVA_DB_UPDATE: true
+        TRIVY_DISABLE_VEX_NOTICE: true
+
+    - name: Check vulnerability count
+      id: vuln_count
+      shell: bash
+      run: |
+        report_file="report.json"
+        vuln_count=$(jq 'if .Results then [.Results[] | select(.Class=="os-pkgs" and .Vulnerabilities!=null) | .Vulnerabilities[]] | length else 0 end' "$report_file")
+        echo "vuln_count: "
+        echo $vuln_count
+        echo "vuln_count=$vuln_count" >> $GITHUB_OUTPUT
+
+    - name: Extract Image Name
+      id: extracted_image_name
+      shell: bash
+      run: |
+        img=$(echo ${{ inputs.image_name }} | cut -d '/' -f2)
+        echo "image_name=$img" >> $GITHUB_OUTPUT
+
+    #OPTIONAL: upload to github security tab
+    - name: Trivy sarif 
+      uses: aquasecurity/trivy-action@0.28.0
+      continue-on-error: true
+      with:
+        input: ${{ github.workspace }}/build.tar
+        scan-type: "image"
+        format: "sarif"
+        output: "trivy-results-${{ steps.extracted_image_name.outputs.image_name }}.sarif"
+        ignore-unfixed: true
+        vuln-type: "os"
+        severity: "CRITICAL,HIGH"
+        scanners: "vuln"
+      env:
+        TRIVY_SKIP_DB_UPDATE: true
+        TRIVY_SKIP_JAVA_DB_UPDATE: true
+        TRIVY_DISABLE_VEX_NOTICE: true
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      continue-on-error: true
+      with:
+        sarif_file: "trivy-results-${{ steps.extracted_image_name.outputs.image_name }}.sarif"
+
+    - name: Extract Patched Tag
+      id: extract_tag
+      shell: bash
+      run: |
+        imageName="${{ inputs.image_name }}"
+        current_tag="${{ inputs.version_tag }}"
+
+        if [[ $current_tag == *patched-[0-9]* ]]; then
+            patched_number=$(echo "$current_tag" | grep -oP 'patched-\K[0-9]+')
+            incremented_number=$((patched_number+1))
+            new_tag=$(echo "$current_tag" | sed "s/patched-$patched_number/patched-$incremented_number/")
+        else
+            new_tag="${current_tag}-patched-1"
+        fi
+
+        echo "patched_tag=$new_tag" >> $GITHUB_OUTPUT
+        echo "imageName=$imageName" >> $GITHUB_OUTPUT
+
+    - name: Patch container with copa
+      id: copa
+      if: steps.vuln_count.outputs.vuln_count != '0'
+      uses: project-copacetic/copa-action@v1.2.1
+      with:
+        image: ${{ steps.meta.outputs.tags }}
+        image-report: "report.json"
+        patched-tag: ${{ steps.extract_tag.outputs.patched_tag }}
+        timeout: "5m" # optional, default is 5m
+        output: vex.json # optional
+        format: "openvex" # optional, default is openvex
+        custom-socket: $SOCKET # optional, used for custom socket address
+
+    # Push patched image if there are vulnerabilities
+    - name: Docker Push Patched Image
+      id: pushpatched
+      if: |
+        steps.acrLoginToken.conclusion == 'success'
+          && steps.vuln_count.outputs.vuln_count != '0'
+      shell: bash
+      run: |
+        docker tag ${{ steps.copa.outputs.patched-image }} ${{ steps.meta.outputs.tags }}
+        docker tag ${{ steps.copa.outputs.patched-image }} ${{ inputs.registry_login_server }}/${{ inputs.image_name }}:${{ inputs.version_tag }}
+        docker push --all-tags ${{ inputs.registry_login_server }}/${{ inputs.image_name }}
+
+    - name: list images
+      shell: bash
+      run: |
+        docker images
+
+    # Push original build image if there are no vulnerabilities found
+    - name: Docker Push Original Image
+      id: pushoriginal
+      if: |
+        steps.acrLoginToken.conclusion == 'success'
+          && steps.vuln_count.outputs.vuln_count == '0'
+      shell: bash
+      run: |
+        echo "trace echos"
+        echo "steps.meta.outputs.version:"
+        echo ${{ steps.meta.outputs.version }}
+        echo "steps.meta.outputs.tags:"
+        echo ${{ steps.meta.outputs.tags }}
+        echo "inputs.image_name:"
+        echo ${{ inputs.image_name }}
+        echo "inputs.version_tag:"
+        echo ${{ inputs.version_tag }}
+        echo  "inputs.registry_login_server:"
+        echo ${{ inputs.registry_login_server }}
+        docker tag ${{ inputs.registry_login_server }}/${{ inputs.image_name }}:${{ steps.meta.outputs.version }} ${{ inputs.registry_login_server }}/${{ inputs.image_name }}:${{ inputs.version_tag }}
+        docker push --all-tags ${{ inputs.registry_login_server }}/${{ inputs.image_name }}

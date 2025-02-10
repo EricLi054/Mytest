@@ -1,0 +1,55 @@
+services:
+  backend:
+    image: backend:latest
+    build:  #will build if image not found
+      context: ../backend/DigitalPlatform.API/.
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - placement
+      - configredis
+    networks:
+      - hello-dapr
+
+  backend-dapr:
+    image: "daprio/daprd:edge"
+    command: [
+      "./daprd",
+      "--app-id", "backend",
+      "--app-port", "8080",
+      "--placement-host-address", "placement:50006",
+      "--log-level", "debug",
+      "--resources-path", "./dapr-components"
+    ]
+    volumes:
+      - "./local-data:/data"
+      - "./dapr-components/:/dapr-components"
+    depends_on:
+      - backend
+      - configredis
+    network_mode: "service:backend"
+
+  placement:
+    image: "daprio/dapr"
+    command: ["./placement", "--port", "50006"]
+    ports:
+      - "50006:50006"
+    depends_on:
+      - configredis
+
+  configredis:
+    image: redis:6
+    ports:
+      - "6381:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - ./local-data:/data
+      - ./redis-init.sh:/usr/local/bin/redis-init.sh
+      - ./local-data/log/redis:/var/log/redis/
+    entrypoint: ["/bin/sh", "/usr/local/bin/redis-init.sh"]
+    networks:
+      - hello-dapr
+
+networks:
+  hello-dapr: null

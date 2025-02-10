@@ -1,0 +1,48 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+{
+	"name": "next",
+    "hostRequirements": {
+        "cpus": 4
+    },	
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+	"onCreateCommand": "bash ./.devcontainer/init.sh",
+    "remoteUser": "vscode",
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers/features/dotnet": {},
+		"ghcr.io/dapr/cli/dapr-cli:latest": {},
+		"ghcr.io/devcontainers/features/github-cli":{},
+		"ghcr.io/devcontainers/features/node:1": "lts",
+		"ghcr.io/devcontainers/features/azure-cli:1": {},
+		"ghcr.io/devcontainers/features/powershell:1": {},
+		"ghcr.io/devcontainers/features/common-utils": {}
+    },
+	//"postCreateCommand": "",
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"terminal.integrated.defaultProfile.linux": "zsh",
+				"terminal.integrated.profiles.linux": {
+				  "zsh": {
+					"path": "/bin/zsh"
+				  }
+				}
+			},
+			"extensions": [
+				"ms-dotnettools.csdevkit",
+				"ms-azuretools.vscode-dapr",
+				"ms-azuretools.vscode-docker",
+				"ryanluker.vscode-coverage-gutters",
+				"sonarsource.sonarlint-vscode",
+				"eamodio.gitlens"
+			]
+		}
+	},
+	"mounts": [{
+		"source": "/etc/localtime",
+		"target": "/etc/localtime",
+		"type": "bind"
+	}]
+}

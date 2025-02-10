@@ -1,0 +1,56 @@
+{
+  "sys": {
+    "type": "Changeset",
+    "createdAt": "1733295920669",
+    "space": {
+      "sys": {
+        "id": "094jvk1kftwp",
+        "linkType": "Space",
+        "type": "Link"
+      }
+    },
+    "source": {
+      "sys": {
+        "id": "release-wip-2.0.4",
+        "linkType": "Environment",
+        "type": "Link"
+      }
+    },
+    "target": {
+      "sys": {
+        "id": "release-target-2.0.4",
+        "linkType": "Environment",
+        "type": "Link"
+      }
+    }
+  },
+  "items": [
+    {
+      "changeType": "update",
+      "entity": {
+        "sys": {
+          "type": "Link",
+          "linkType": "Entry",
+          "id": "2WyH52ur4pDCDLrlylj2w0"
+        }
+      },
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/fields/contentItems/en-US/0/sys/id",
+          "value": "1s2sGpmYIKx6TakgRWVmbw"
+        }
+      ]
+    },
+    {
+      "changeType": "delete",
+      "entity": {
+        "sys": {
+          "type": "Link",
+          "linkType": "Entry",
+          "id": "2hM6NtucChTwBZE2voRnVe"
+        }
+      }
+    }
+  ]
+}

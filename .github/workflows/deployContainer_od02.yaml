@@ -1,0 +1,139 @@
+name: Build-Scan-Patch-Deploy Container OD02
+
+# Build backend and frontend containers on pull requests
+# Pushes containers to od02
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+      - "release/**"
+      - "hotfix/**"
+    paths:
+      - 'infrastructure/container-app/od02/**'
+      - 'infrastructure/modules/container-app/**'
+      - '.github/workflows/deployContainer_od02.yaml'
+  push:
+    branches:
+      - main
+      - "release/**"
+      - "hotfix/**"
+    paths:
+      - 'infrastructure/container-app/od02/**'
+      - 'infrastructure/modules/container-app/**'
+      - '.github/workflows/deployContainer_od02.yaml'
+env:
+  container_registry_login_server: racwa.azurecr.io
+  container_registry_path: next-rac-com-au
+  frontend_image_name: next-rac-frontend
+  backend_image_name: next-rac-backend
+  acr_keyvault_name: acr-racwa
+  acr_token_secret_name: next-rac-com-au-write-access
+  app_config_endpoint: https://next-rac-appconfig-npe.azconfig.io
+
+jobs:
+  versioning:
+    name: Update Version
+    runs-on: ubuntu-latest
+    outputs:
+      semVer: ${{ steps.gitversion.outputs.semVer }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/bump-version
+        id: gitversion
+
+  backend_container:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+    name: Build-Scan-Patch-Push Backend Container
+    needs: versioning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.container_registry_login_server }}
+          acr_keyvault_name: ${{ env.acr_keyvault_name }}
+          acr_token_secret_name: ${{ env.acr_token_secret_name }}
+          image_name: ${{ env.container_registry_path }}/${{ env.backend_image_name }}
+          image_tag: ${{ github.ref == 'refs/heads/main' && 'latest' || '' }}
+          version_tag: ${{ needs.versioning.outputs.semVer }}
+          docker_context: ./backend/DigitalPlatform.API
+          dockerfile_path: ./backend/DigitalPlatform.API/Dockerfile
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          AZURE_NPM_TOKEN: ${{ secrets.AZURE_NPM_TOKEN }}
+
+  frontend_container:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+    name: Build-Scan-Patch-Push Frontend Container
+    needs: versioning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Azure Login
+        uses: Azure/login@v1.1
+        with:
+          allow-no-subscriptions: true
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - uses: ./.github/actions/get-appconfig-value
+        id: cloudinary_name
+        with:
+          appconfig_endpoint: ${{ env.app_config_endpoint }}
+          config_key: cloudinary-space
+      - uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.container_registry_login_server }}
+          acr_keyvault_name: ${{ env.acr_keyvault_name }}
+          acr_token_secret_name: ${{ env.acr_token_secret_name }}
+          image_name: ${{ env.container_registry_path }}/${{ env.frontend_image_name }}
+          image_tag: ${{ github.ref == 'refs/heads/main' && 'latest' || '' }}
+          version_tag: ${{ needs.versioning.outputs.semVer }}
+          docker_build_args: |
+            CLOUDINARY_NAME=${{ steps.cloudinary_name.outputs.value }}
+          docker_context: ./frontend
+          dockerfile_path: ./frontend/Dockerfile.ci
+          generate_design_system_npmrc: true
+          prefetch_node_modules: true
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          AZURE_NPM_TOKEN: ${{ secrets.AZURE_NPM_TOKEN }}
+
+  deploy_od02:
+    name: Deploy Infrastructure OD02
+    needs: [versioning, backend_container, frontend_container]
+    uses: ./.github/workflows/deploy_terraform_cloud_workflow.yaml
+    with:
+      arm_subscription_id: 4b737f05-03e2-4b5a-88a4-aa8264a39bed # digital-npe
+      blast_radius_calculation: true
+      i_like_fun: true
+      use_saved_plan: true
+      compare_plan: true
+      apply_empty_plan: false
+      tf_skip_apply: ${{ github.event_name == 'pull_request' }}
+      tf_apply_environment: od02
+      tf_dir: infrastructure/container-app/od02/
+      tf_backend_key: "infrastructure_container_app_od02.tfstate"
+      tf_options_plan: -input=false -var="image_version=${{ needs.versioning.outputs.semVer }}"
+      tf_options_apply: -input=false -auto-approve
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}

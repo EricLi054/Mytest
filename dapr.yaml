@@ -1,0 +1,21 @@
+version: 1
+common: # optional section for variables shared across apps
+  resourcesPath: dapr-components # any dapr resources to be shared across apps
+  # configFilePath: dapr-config/config.yaml # (optional) can be default by convention too, ignore if file is not found.
+  appLogDestination: console # (optional), can be file, console or fileAndConsole. default is fileAndConsole.
+  daprdLogDestination: console # (optional), can be file, console or fileAndConsole. default is file.
+  env:  # any environment variable shared across apps
+    DEBUG: true
+apps:
+  - appID: frontend # optional
+    appDirPath: frontend/ # REQUIRED
+    appProtocol: http
+    appPort: 3000
+    daprHTTPPort: 3501
+    command: ["pnpm", "dev"]
+  - appID: backend # optional
+    appDirPath: backend/DigitalPlatform.API/ # REQUIRED
+    appProtocol: http
+    appPort: 5078
+    daprHTTPPort: 3502
+    command: ["dotnet", "run"]
