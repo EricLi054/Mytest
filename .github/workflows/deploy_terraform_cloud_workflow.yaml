@@ -1,4 +1,4 @@
-name: RAC Azure Terraform Plan & Apply Workflow
+name: '🏗️ RAC Azure Terraform Plan & Apply Workflow'
 
 on:
   workflow_call:
@@ -29,19 +29,19 @@ on:
       tf_backend_container:
         required: false
         type: string
-        default: "" # Set in code below
+        default: '' # Set in code below
       tf_backend_key:
         required: false
         type: string
-        default: "${{ github.repository }}.tfstate"
+        default: '${{ github.repository }}.tfstate'
       tf_backend_resource_group:
         required: false
         type: string
-        default: "platform-terraform-state"
+        default: 'platform-terraform-state'
       tf_backend_storage_account:
         required: false
         type: string
-        default: "racwaplatformtfstate"
+        default: 'racwaplatformtfstate'
       tf_backend_use_azuread_auth:
         required: false
         type: boolean
@@ -49,7 +49,7 @@ on:
       tf_backend_subscription_id:
         required: false
         type: string
-        default: "18ebc478-c4af-4365-a746-9026391a40da"
+        default: '18ebc478-c4af-4365-a746-9026391a40da'
       tf_options_apply:
         default: -input=false -auto-approve
         required: false
@@ -71,11 +71,11 @@ on:
         required: false
         type: string
       tfsec_args:
-        default: "--ignore-hcl-errors"
+        default: '--ignore-hcl-errors'
         required: false
         type: string
       tf_plan_environment:
-        default: ""
+        default: ''
         required: false
         type: string
       tf_skip_apply:
@@ -83,11 +83,11 @@ on:
         required: false
         type: boolean
       tf_apply_environment:
-        default: ""
+        default: ''
         required: false
-        type: string        
+        type: string
       test_dir:
-        default: ""
+        default: ''
         required: false
         type: string
       compare_plan_auth_mode:
@@ -160,7 +160,7 @@ on:
           Set to true when using federated credentials.
         default: false
         required: false
-        type: boolean        
+        type: boolean
 
     secrets:
       AZURE_CLIENT_ID:
@@ -170,14 +170,14 @@ on:
       AZURE_CREDENTIALS:
         required: false
       AZURE_TENANT_ID:
-        required: true
+        required: false
       SVC_DOMAIN_JOIN_PASSWORD:
         required: false
       NPE_SVC_DOMAIN_JOIN_PASSWORD:
         required: false
       PERSONAL_ACCESS_TOKEN:
         required: false
-      AZDO_PERSONAL_ACCESS_TOKEN: 
+      AZDO_PERSONAL_ACCESS_TOKEN:
         required: false
 
 jobs:
@@ -185,10 +185,10 @@ jobs:
     name: Plan
     environment: ${{inputs.tf_plan_environment}}
     env:
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       ARM_SUBSCRIPTION_ID: ${{ inputs.arm_subscription_id }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       SVC_DOMAIN_JOIN_PASSWORD: ${{ secrets.SVC_DOMAIN_JOIN_PASSWORD }}
       NPE_SVC_DOMAIN_JOIN_PASSWORD: ${{ secrets.NPE_SVC_DOMAIN_JOIN_PASSWORD }}
       PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -201,7 +201,7 @@ jobs:
       plan_show_filename: ${{ steps.compare_plan.outputs.plan_show_filename }}
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: terraform-compliance/github_action@0.3.0
+      - uses: terraform-compliance/github_action@0357bd3be2b0a5739f5c09c64366d50f64a9056f # 0.3.0
         if: inputs.test_dir != ''
 
       - name: fix-terraform-container
@@ -217,14 +217,14 @@ jobs:
 
       - name: Checkout Code and Submodules
         if: ${{ env.PERSONAL_ACCESS_TOKEN }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           submodules: true
-          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
 
       - name: Checkout Code
         if: ${{ env.PERSONAL_ACCESS_TOKEN == '' }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Pre-Script
         if: ${{ inputs.pre_script != '' }}
@@ -232,7 +232,7 @@ jobs:
         run: ${{ inputs.pre_script }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1.2.1
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
           terraform_version: ${{ inputs.tf_version }}
 
@@ -240,32 +240,32 @@ jobs:
         continue-on-error: false
         run: terraform -chdir='${{ inputs.tf_dir }}' fmt -check
 
+      - name: Set Environment Variables for Federated Credentials
+        if: ${{ inputs.use_federated_credentials && !inputs.use_npe_tenant }}
+        run: |
+          echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID }}" >> $GITHUB_ENV
+
+      - name: Set Environment Variables for Federated Credentials NPE Tenant
+        if: ${{ inputs.use_federated_credentials && inputs.use_npe_tenant }}
+        run: |
+          echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID_NPE }}" >> $GITHUB_ENV
+
       - name: Azure Login Federated Creds
-        uses: Azure/login@v1
-        if : ${{ inputs.use_federated_credentials }}
+        uses: Azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        if: ${{ inputs.use_federated_credentials }}
         with:
           client-id: ${{ !inputs.use_npe_tenant && vars.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID_NPE }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ inputs.arm_subscription_id }}
           allow-no-subscriptions: true
 
       - name: Azure Login
-        uses: Azure/login@v1
+        uses: Azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
         if: ${{ ! inputs.use_federated_credentials }}
         with:
           allow-no-subscriptions: true
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set Environment Variables for Federated Credentials
-        if: ${{ inputs.use_federated_credentials && !inputs.use_npe_tenant }}
-        run: |
-          echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID }}" >> $GITHUB_ENV
-        
-      - name: Set Environment Variables for Federated Credentials NPE Tenant
-        if: ${{ inputs.use_federated_credentials && inputs.use_npe_tenant }}
-        run: |
-          echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID_NPE }}" >> $GITHUB_ENV
-  
       - name: Terraform Init
         run: terraform -chdir='${{ inputs.tf_dir }}' init -backend-config="subscription_id=${{ inputs.tf_backend_subscription_id }}" -backend-config="resource_group_name=${{ inputs.tf_backend_resource_group }}" -backend-config="storage_account_name=${{ inputs.tf_backend_storage_account }}" -backend-config="container_name=${{ env.tf_backend_container }}" -backend-config="key=${{ inputs.tf_backend_key }}" -backend-config="use_azuread_auth=${{ inputs.tf_backend_use_azuread_auth }}" -backend-config="use_oidc=${{ inputs.use_federated_credentials }}"
 
@@ -378,15 +378,15 @@ jobs:
 
       - name: Publish Test Report
         if: inputs.test_dir != ''
-        uses: mikepenz/action-junit-report@v3
+        uses: mikepenz/action-junit-report@97744eca465b8df9e6e33271cb155003f85327f1 # v5
         with:
-          report_paths: "test-report.xml"
+          report_paths: 'test-report.xml'
           fail_on_failure: true
           check_name: CHECK - TC - ${{ env.GITHUB_WORKFLOW }}
 
       - name: Run TFSec
         if: ${{ inputs.run_tfsec_report }}
-        uses: aquasecurity/tfsec-pr-commenter-action@v1.3.1
+        uses: aquasecurity/tfsec-pr-commenter-action@7a44c5dcde5dfab737363e391800629e27b6376b # v1.3.1
         with:
           working_directory: ${{ inputs.tf_dir }}
           tfsec_args: ${{ inputs.tfsec_args }}
@@ -397,11 +397,11 @@ jobs:
       - name: Blast Radius Calculation
         if: ${{ inputs.blast_radius_calculation }}
         id: blast_radius_calculation_step
-        uses: racwa/blast-radius-calculation-action@1.8.2
+        uses: racwa/blast-radius-calculation-action@9e0da847284c65052e1d5a86fa5ed21405942d14 # 1.8.3
         with:
-          rego-file-location: ".github/workflows/terraform.rego"
+          rego-file-location: '.github/workflows/terraform.rego'
           terraform-plan-location: ${{ inputs.tf_plan_file }}
-          gh-token: "${{ secrets.GITHUB_TOKEN }}"
+          gh-token: '${{ secrets.GITHUB_TOKEN }}'
           terraform-dir: ${{ inputs.tf_dir }}
           show-images: ${{ inputs.i_like_fun }}
           use-static-opa-binary: ${{ inputs.use_static_opa_binary }}
@@ -422,25 +422,16 @@ jobs:
             echo "workflow_environment=WorkflowApprovalRequired" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Azure Logout & Cleanup
-        uses: azure/CLI@v1
-        with:
-          azcliversion: 2.0.72
-          inlineScript: |
-            az logout
-            az cache purge
-            az account clear
-
   apply:
     name: apply
     if: ${{ inputs.tf_skip_apply == false }}
     needs: [plan]
     environment: ${{ inputs.tf_apply_environment }}
     env:
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       ARM_SUBSCRIPTION_ID: ${{ inputs.arm_subscription_id }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       SVC_DOMAIN_JOIN_PASSWORD: ${{ secrets.SVC_DOMAIN_JOIN_PASSWORD }}
       NPE_SVC_DOMAIN_JOIN_PASSWORD: ${{ secrets.NPE_SVC_DOMAIN_JOIN_PASSWORD }}
       PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -462,14 +453,14 @@ jobs:
 
       - name: Checkout Code and Submodules
         if: ${{ env.PERSONAL_ACCESS_TOKEN }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           submodules: true
-          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
 
       - name: Checkout Code
         if: ${{ env.PERSONAL_ACCESS_TOKEN == '' }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Pre-Script
         if: ${{ inputs.pre_script != '' }}
@@ -477,7 +468,7 @@ jobs:
         run: ${{ inputs.pre_script }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1.2.1
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
           terraform_version: ${{ inputs.tf_version }}
 
@@ -485,35 +476,35 @@ jobs:
         continue-on-error: false
         run: terraform -chdir='${{ inputs.tf_dir }}' fmt -check
 
-      - name: Azure Login Federated Creds
-        uses: Azure/login@v1
-        if : ${{ inputs.use_federated_credentials }}
-        with:
-          client-id: ${{ !inputs.use_npe_tenant && vars.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID_NPE }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ inputs.arm_subscription_id }}
-          allow-no-subscriptions: true
-
-      - name: Azure Login
-        uses: Azure/login@v1
-        if: ${{ ! inputs.use_federated_credentials }}
-        with:
-          allow-no-subscriptions: true
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
       - name: Set Environment Variables for Federated Credentials
         if: ${{ inputs.use_federated_credentials && !inputs.use_npe_tenant }}
         run: |
           echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID }}" >> $GITHUB_ENV
-        
+
       - name: Set Environment Variables for Federated Credentials NPE Tenant
         if: ${{ inputs.use_federated_credentials && inputs.use_npe_tenant }}
         run: |
           echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID_NPE }}" >> $GITHUB_ENV
 
+      - name: Azure Login Federated Creds
+        uses: Azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        if: ${{ inputs.use_federated_credentials }}
+        with:
+          client-id: ${{ !inputs.use_npe_tenant && vars.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID_NPE }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ inputs.arm_subscription_id }}
+          allow-no-subscriptions: true
+
+      - name: Azure Login
+        uses: Azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        if: ${{ ! inputs.use_federated_credentials }}
+        with:
+          allow-no-subscriptions: true
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Terraform Init
         run: terraform -chdir='${{ inputs.tf_dir }}' init -backend-config="subscription_id=${{ inputs.tf_backend_subscription_id }}" -backend-config="resource_group_name=${{ inputs.tf_backend_resource_group }}" -backend-config="storage_account_name=${{ inputs.tf_backend_storage_account }}" -backend-config="container_name=${{ env.tf_backend_container }}" -backend-config="key=${{ inputs.tf_backend_key }}" -backend-config="use_azuread_auth=${{ inputs.tf_backend_use_azuread_auth }}" -backend-config="use_oidc=${{ inputs.use_federated_credentials }}"
-          
+
       - name: Terraform Apply
         if: ${{ ! inputs.use_saved_plan }}
         run: terraform -chdir='${{ inputs.tf_dir }}' apply ${{ inputs.tf_options_apply }}
@@ -554,12 +545,3 @@ jobs:
           # Delete plan
           echo "Delete plan show file: ${{ env.PLAN_SHOW_FILENAME }}"
           az storage blob delete --subscription ${{ inputs.tf_backend_subscription_id }} --account-name ${{ inputs.tf_backend_storage_account }} --auth-mode ${{ inputs.compare_plan_auth_mode }} -c ${{ env.tf_backend_container }} -n  ${{ env.PLAN_SHOW_FILENAME }}
-
-      - name: Azure Logout & Cleanup
-        uses: azure/CLI@v1
-        with:
-          azcliversion: 2.0.72
-          inlineScript: |
-            az logout
-            az cache purge
-            az account clear

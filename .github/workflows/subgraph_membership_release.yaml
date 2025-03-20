@@ -1,0 +1,583 @@
+name: '🛠️ Backend: Membership Subgraph'
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+    tags-ignore:
+      - '*'
+    paths:
+      - '.github/workflows/subgraph_membership_release.yaml'
+      - 'infrastructure/modules/container-app/**'
+      - 'backend/subgraphs/Membership/**'
+      - 'backend/subgraphs/tests/Membership.Tests/**'
+      - 'backend/subgraphs/tests/Membership.Integration.Tests/**'
+
+env:
+  GIT_TAG: 'Membership.Subgraph'
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_PATH: './backend/subgraphs/Membership'
+  TEST_PROJECT_PATH: './backend/subgraphs/tests/Membership.Tests'
+  PROJECT: './backend/subgraphs/Membership/Membership.csproj'
+  TEST_PROJECT: './backend/subgraphs/tests/Membership.Tests/Membership.Tests.csproj'
+  INTEGRATION_TEST_PROJECT_PATH: './backend/subgraphs/tests/Membership.Integration.Tests'
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  build_and_test:
+    name: Build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.git-tag.outputs.version }}
+      release-notes: ${{ steps.release-notes.outputs.release-notes }}
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🦺 Setup .NET ${{ env.DOTNET_VERSION }} Environment
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            ${{ env.PROJECT_PATH }}/packages.lock.json
+            ${{ env.TEST_PROJECT_PATH }}/packages.lock.json
+          source-url: https://pkgs.dev.azure.com/racwa/_packaging/RACI_Integration_Feed/nuget/v3/index.json
+
+      - name: 🍻 Install Dependencies
+        shell: bash
+        run: |
+          dotnet restore ${{ env.PROJECT_PATH }} --locked-mode 
+          dotnet restore ${{ env.TEST_PROJECT_PATH }} --locked-mode
+
+      - name: 🏗️ Build project
+        run: dotnet build ${{ env.PROJECT }} --configuration Release --no-restore
+
+      - name: 🧪 Test
+        run: dotnet test ${{ env.TEST_PROJECT_PATH }} --no-restore
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 📦 Upload artifact
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        with:
+          name: build-${{ env.PROJECT_NAME }}
+          path: ${{ env.PROJECT_PATH }}/bin/Release/net8.0
+        env:
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🏷️ Git Tag
+        id: git-tag
+        uses: './.github/actions/create-git-tag'
+        with:
+          application: ${{ env.GIT_TAG }}
+          is_production: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📝 Create Release Notes
+        id: release-notes
+        uses: './.github/actions/release-notes'
+        with:
+          application_name: 'Membership Subgraph'
+          git_tag_name: ${{ env.GIT_TAG }}
+          application_directory: 'backend/subgraphs/Membership'
+          shared_resources: 'backend/subgraphs/Shared,backend/subgraphs/tests/Membership.Tests,infrastructure/modules/container-app,.github/workflows/subgraph_membership_release.yaml'
+          version: ${{ steps.git-tag.outputs.version }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  integration_test:
+    name: Integration Tests
+    needs: build_and_test
+    runs-on: digital-npe-ubuntu-latest
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🦺 Setup .NET ${{ env.DOTNET_VERSION }} Environment
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: ${{ env.INTEGRATION_TEST_PROJECT_PATH }}/packages.lock.json
+          source-url: https://pkgs.dev.azure.com/racwa/_packaging/RACI_Integration_Feed/nuget/v3/index.json
+
+      - name: 🍻 Install Dependencies
+        shell: bash
+        run: dotnet restore ${{ env.INTEGRATION_TEST_PROJECT_PATH }} --locked-mode
+
+      - name: 🧪 Integration Test
+        run: dotnet test '${{ env.INTEGRATION_TEST_PROJECT_PATH }}/Membership.Integration.Tests.csproj' --no-restore
+        env:
+          ASPNETCORE_ENVIRONMENT: local
+          CI: '' #force appsettings to auto populate with kv values
+
+  build_container:
+    name: Build Container Image
+    runs-on: ubuntu-latest
+    needs: build_and_test
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📝 Set project variable
+        run: echo "SUBGRAPH_IMAGE_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')-subgraph" >> $GITHUB_ENV
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 🔽 Download artifact
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4
+        with:
+          name: build-${{ env.PROJECT_NAME }}
+          path: ./${{ env.PROJECT_PATH }}-output
+        env:
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🎪 Build and Push Container Image
+        uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.CONTAINER_REGISTRY_LOGIN_SERVER }}
+          acr_keyvault_name: ${{ env.ACR_KEYVAULT_NAME }}
+          acr_token_secret_name: ${{ env.ACR_TOKEN_SECRET_NAME }}
+          image_name: ${{ env.CONTAINER_REGISTRY_PATH }}/${{ env.SUBGRAPH_IMAGE_NAME }}
+          image_tag: 'latest'
+          version_tag: ${{ needs.build_and_test.outputs.version }}
+          docker_context: ./${{ env.PROJECT_PATH }}-output
+          dockerfile_path: ${{ env.PROJECT_PATH }}/Dockerfile
+          azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+        env:
+          CONTAINER_REGISTRY_LOGIN_SERVER: racwa.azurecr.io
+          CONTAINER_REGISTRY_PATH: rac-digital
+          SUBGRAPH_IMAGE_NAME: ${{ env.SUBGRAPH_IMAGE_NAME }}
+          ACR_KEYVAULT_NAME: acr-racwa
+          ACR_TOKEN_SECRET_NAME: rac-digital-write-access
+
+  dev_deploy:
+    name: Deploy to DEV
+    needs: [build_container, build_and_test]
+    runs-on: digital-npe-ubuntu-latest
+    environment: membership-subgraph-dev
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🔧 Set subgraph project variable
+        run: echo "SUBGRAPH_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')-subgraph" >> $GITHUB_ENV
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -refresh=false
+            -var="image_version=${{ needs.build_and_test.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../.${{ env.PROJECT_PATH }}/infra/templates/resources/container-app/${{ env.SUBGRAPH_NAME }}-template.yaml"
+            -var="container_apps_folder=../../.${{ env.PROJECT_PATH }}/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_${{ env.PROJECT_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: dev
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          SUBGRAPH_NAME: ${{ env.SUBGRAPH_NAME }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🐙 Terraform Apply
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tf.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve -refresh=false
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tf.plan'
+
+  sit_deploy:
+    name: Deploy to SIT
+    if: github.ref == 'refs/heads/main'
+    needs: [build_container, build_and_test]
+    runs-on: digital-npe-ubuntu-latest
+    environment: membership-subgraph-sit
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🔧 Set subgraph project variable
+        run: echo "SUBGRAPH_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')-subgraph" >> $GITHUB_ENV
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -refresh=false
+            -var="image_version=${{ needs.build_and_test.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../.${{ env.PROJECT_PATH }}/infra/templates/resources/container-app/${{ env.SUBGRAPH_NAME }}-template.yaml"
+            -var="container_apps_folder=../../.${{ env.PROJECT_PATH }}/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_${{ env.PROJECT_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: sit
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          SUBGRAPH_NAME: ${{ env.SUBGRAPH_NAME }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🐙 Terraform Apply
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tf.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve -refresh=false
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tf.plan'
+
+  uat_plan:
+    # We want this check so that the deployment section in the repository shows the most recent deployment, and not 'waiting' for deployment
+    if: github.ref == 'refs/heads/main' && github.run_attempt > 1
+    name: Deploy to UAT - Plan
+    needs: [build_container, build_and_test]
+    runs-on: digital-npe-ubuntu-latest
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      terraform_plan_filename: ${{ steps.terraform_plan.outputs.terraform_plan_filename }}
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🔧 Set subgraph project variable
+        run: echo "SUBGRAPH_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')-subgraph" >> $GITHUB_ENV
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 📺 Terraform Plan
+        id: terraform_plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -var="image_version=${{ needs.build_and_test.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../.${{ env.PROJECT_PATH }}/infra/templates/resources/container-app/${{ env.SUBGRAPH_NAME }}-template.yaml"
+            -var="container_apps_folder=../../.${{ env.PROJECT_PATH }}/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_${{ env.PROJECT_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: uat
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          SUBGRAPH_NAME: ${{ env.SUBGRAPH_NAME }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+  uat_deploy:
+    name: Deploy to UAT - Apply
+    runs-on: digital-npe-ubuntu-latest
+    needs: [uat_plan]
+    environment: membership-subgraph-uat
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 🐙 Terraform Apply
+        uses: ./.github/actions/apply-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: '-input=false -auto-approve'
+          terraform_backend_key: 'infrastructure_container_app_backend_${{ env.PROJECT_NAME }}_${{ env.ENV }}.tfstate'
+          terraform_plan_filename: '${{ needs.uat_plan.outputs.terraform_plan_filename }}'
+        env:
+          ENV: uat
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: '${{ env.TERRAFORM_DIRECTORY }}'
+          terraform_plan_file: '${{ needs.uat_plan.outputs.terraform_plan_filename }}'
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+
+  prd_plan:
+    # We want this check so that the deployment section in the repository shows the most recent deployment, and not 'waiting' for deployment
+    if: github.ref == 'refs/heads/main' && github.run_attempt > 1
+    name: Deploy to PRD - Plan
+    needs: [build_container, build_and_test]
+    runs-on: ubuntu-latest
+    environment: prd
+
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      terraform_plan_filename: ${{ steps.terraform_plan.outputs.terraform_plan_filename }}
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🔧 Set subgraph project variable
+        run: echo "SUBGRAPH_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')-subgraph" >> $GITHUB_ENV
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 📺 Terraform Plan
+        id: terraform_plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/prd'
+          terraform_options: >-
+            -input=false
+            -var="image_version=${{ needs.build_and_test.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../.${{ env.PROJECT_PATH }}/infra/templates/resources/container-app/${{ env.SUBGRAPH_NAME }}-template.yaml"
+            -var="container_apps_folder=../../.${{ env.PROJECT_PATH }}/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_${{ env.PROJECT_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: prd
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          SUBGRAPH_NAME: ${{ env.SUBGRAPH_NAME }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+  prd_deploy:
+    name: Deploy to PRD - Apply
+    runs-on: ubuntu-latest
+    needs: [build_and_test, prd_plan]
+    environment: membership-subgraph-prd
+
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ env.PROJECT_PATH }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 🐙 Terraform Apply
+        uses: ./.github/actions/apply-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/prd'
+          terraform_options: '-input=false -auto-approve'
+          terraform_backend_key: 'infrastructure_container_app_backend_${{ env.PROJECT_NAME }}_${{ env.ENV }}.tfstate'
+          terraform_plan_filename: '${{ needs.prd_plan.outputs.terraform_plan_filename }}'
+        env:
+          ENV: prd
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: '${{ env.TERRAFORM_DIRECTORY }}'
+          terraform_plan_file: '${{ needs.prd_plan.outputs.terraform_plan_filename }}'
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/prd'
+
+      - name: 🏷️ Git Tag
+        id: git-tag
+        uses: './.github/actions/create-git-tag'
+        if: always()
+        with:
+          application: ${{ env.GIT_TAG }}
+          is_production: true
+          release_notes: ${{ needs.build_and_test.outputs.release-notes }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

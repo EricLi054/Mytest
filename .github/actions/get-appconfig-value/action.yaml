@@ -23,18 +23,16 @@ runs:
   steps:
     - name: Azure Login
       if: inputs.perform_azure_login == 'true'
-      uses: Azure/login@v1.1
+      uses: Azure/login@6786a47b5726030896be70ac35e07bd81673fe81 # v1.1
       with:
         allow-no-subscriptions: true
         creds: ${{ env.AZURE_CREDENTIALS }}
 
     - name: Get Value
       id: getValue
-      uses: azure/CLI@v1
+      uses: Azure/cli@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2
       with:
-        azcliversion: 2.51.0
+        # azcliversion: 2.51.0
         inlineScript: |
           field_value=$(az appconfig kv list --endpoint ${{ inputs.appconfig_endpoint }} --auth-mode login --fields value --key ${{ inputs.config_key }} --output tsv)
           echo "value=$field_value" >> "$GITHUB_OUTPUT"
-
-

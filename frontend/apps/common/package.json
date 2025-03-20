@@ -1,0 +1,70 @@
+{
+  "name": "@racwa/common",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "pnpm next build",
+    "clean": "git clean -xdf .next .turbo node_modules",
+    "dev": "pnpm next dev",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "format": "prettier --check . --ignore-path ./.prettierignore",
+    "lint": "eslint",
+    "start": "pnpm next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "imports": {
+    "#*": [
+      "./src/*",
+      "./src/*.ts",
+      "./src/*.tsx",
+      "./src/*/index.ts",
+      "./src/*/index.tsx"
+    ]
+  },
+  "dependencies": {
+    "@contentful/rich-text-plain-text-renderer": "catalog:",
+    "@contentful/rich-text-react-renderer": "catalog:",
+    "@contentful/rich-text-types": "catalog:",
+    "@fortawesome/react-fontawesome": "catalog:",
+    "@mui/icons-material": "catalog:mui",
+    "@mui/material": "catalog:mui",
+    "@mui/material-nextjs": "catalog:mui",
+    "@next/third-parties": "catalog:next15",
+    "@racwa/analytics": "catalog:",
+    "@racwa/app-config": "workspace:*",
+    "@racwa/cache": "workspace:*",
+    "@racwa/gql": "workspace:*",
+    "@racwa/otel": "workspace:*",
+    "@racwa/react-components": "catalog:",
+    "@racwa/styles": "catalog:",
+    "@racwa/ui": "workspace:*",
+    "gql.tada": "catalog:",
+    "next": "catalog:next15",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19",
+    "react-swipeable": "^7.0.2",
+    "server-only": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@racwa/eslint-config": "workspace:*",
+    "@racwa/prettier-config": "workspace:*",
+    "@racwa/tsconfig": "workspace:*",
+    "@racwa/vitest-config": "workspace:*",
+    "@storybook/react": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "@vitest/coverage-istanbul": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "prettier": "@racwa/prettier-config"
+}

@@ -1,9 +1,0 @@
-export const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? '';
-export const loginPageURL = 'https://login*.rac*.com.au/**';
-export const landingPageURL = `${baseURL}/myrac`;
-export const contactDetailsPageURL = `${baseURL}/myrac/profile/contact-details`;
-export const updateMyDetailsPageBaseURL = `${baseURL}/myrac/update-my-details`;
-export const updateMyDetailsPageURLWildcard = '**/update-my-details?**';
-export const somethingWentWrongPageURL = `${baseURL}/something-went-wrong`;
-export const faqPageURL = `${baseURL}/myrac/help`;
-export const lifeInsurancePageURL = `${baseURL}/myrac/products/life-insurance`;

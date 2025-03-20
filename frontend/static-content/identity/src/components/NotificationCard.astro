@@ -1,0 +1,45 @@
+---
+// NotificationCard
+
+// A RacwaNotificationCard component that is hidden by default.
+
+interface Props {
+  id: string;
+  message: string;
+}
+
+const { id, message } = Astro.props as Props;
+import circleInfo from "../../public/icons/circle-info.svg";
+---
+
+<div id={id} style="display: none">
+  <img src=`${circleInfo.src}` />
+  <p>{message}</p>
+</div>
+
+<style>
+  div {
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    border-width: 1px 1px 1px 8px;
+    border-style: solid;
+    border-color: #33424d;
+    border-radius: 3px;
+    background-color: white;
+    margin: 16px 0px;
+    padding: 16px 16px 16px 24px;
+  }
+
+  img {
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
+  }
+
+  p {
+    flex-grow: 1;
+    font-size: 18px;
+    font-weight: 400;
+  }
+</style>

@@ -1,13 +1,117 @@
 {
+  "cSpell.ignorePaths": ["graphql-env.d.ts"],
+  "cSpell.language": "en-GB",
+  "cSpell.words": [
+    "APIM",
+    "appsettings",
+    "ASPNETCORE",
+    "australiaeast",
+    "autodocs",
+    "azuread",
+    "clearable",
+    "clientproxy",
+    "Cloudinary",
+    "cobertura",
+    "codacy",
+    "codegen",
+    "Color",
+    "containerapp",
+    "Contentful",
+    "dotenv",
+    "esbuild",
+    "fileset",
+    "fontawesome",
+    "fortawesome",
+    "fulfill",
+    "githook",
+    "IADB",
+    "instgrm",
+    "jquery",
+    "Keyvault",
+    "lcov",
+    "mailosaur",
+    "msedge",
+    "mustache",
+    "myrac",
+    "NEXTAUTH",
+    "nextjs",
+    "omnigraph",
+    "opentelemetry",
+    "otel",
+    "precompose",
+    "preinstall",
+    "prettiercache",
+    "racdigitalstore",
+    "RACI",
+    "ractest",
+    "racwa",
+    "racwaplatformtfstate",
+    "sherif",
+    "sitecore",
+    "sublabel",
+    "supergraph",
+    "tada",
+    "tfstate",
+    "tsbuildinfo",
+    "tseslint",
+    "typecheck",
+    "vite",
+    "vitejs",
+    "vitest"
+  ],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.quickSuggestions": {
+    "strings": "on"
+  },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
-  "eslint.workingDirectories": ["frontend"],
-  "jest.runMode": "on-demand",
-  "coverage-gutters.showGutterCoverage": false,
-  "coverage-gutters.showLineCoverage": true,
-  "[typescript]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode"
+  "eslint.rules.customizations": [{ "rule": "*", "severity": "warn" }],
+  "eslint.useFlatConfig": true,
+  "eslint.workingDirectories": [
+    { "pattern": "frontend/apps/*/" },
+    { "pattern": "frontend/packages/*/" },
+    { "pattern": "tooling/*/" }
+  ],
+  "prettier.ignorePath": "tooling/prettier/.prettierignore",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.autoImportFileExcludePatterns": [
+    "next/router.d.ts",
+    "next/dist/client/router.d.ts"
+  ],
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "typescript.preferences.importModuleSpecifierEnding": "minimal",
+  "typescript.preferences.importModuleSpecifier": "shortest",
+  "files.associations": {
+    "*.yaml": "github-actions-workflow",
+    ".env": "properties",
+    ".env.*": "properties"
   },
-  "[typescriptreact]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode"
+  "[yaml]": {
+    "editor.autoIndent": "keep",
+    "editor.tabSize": 2,
+    "prettier.singleQuote": true
   },
+  "[github-actions-workflow]": {
+    "editor.autoIndent": "keep",
+    "editor.tabSize": 2,
+    "prettier.singleQuote": true
+  },
+  "[terraform]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "hashicorp.terraform",
+    "editor.tabSize": 2
+  },
+  "[terraform-vars]": {
+    "editor.tabSize": 2
+  },
+  "[astro]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[csharp]": {
+    "editor.defaultFormatter": "ms-dotnettools.csharp"
+  }
 }

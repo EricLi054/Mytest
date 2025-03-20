@@ -1,0 +1,539 @@
+﻿schema @link(url: "https:\/\/specs.apollo.dev\/federation\/v2.6", import: [ "@tag", "@key", "FieldSet" ]) {
+  query: Query
+  mutation: Mutation
+}
+
+interface Error {
+  message: String!
+}
+
+type ADB2CUserAccount {
+  id: UUID!
+  accountEnabled: Boolean!
+  displayName: String!
+  crmId: UUID
+  email: String
+}
+
+type Address {
+  buildingName: String
+  subBuildingNumber: String
+  unitNumber: String
+  lotNumber: String
+  houseNumber: String
+  streetName: String
+  poBox: String
+  suburb: String
+  state: String
+  postcode: String
+  country: String
+  dpid: String
+}
+
+type CheckAndSendOtpResponse {
+  sendOtpResponse: SendOtpResponse
+  errors: [CheckAndSendOtpError!]
+}
+
+type CheckAndSendRegistrationOtpResponse {
+  sendOtpResponse: SendOtpResponse
+  errors: [CheckAndSendRegistrationOtpError!]
+}
+
+type CheckAndVerifyOtpResponse {
+  verifyOtpResponse: VerifyOtpResponse
+  errors: [CheckAndVerifyOtpError!]
+}
+
+type CheckAndVerifyRegistrationOtpResponse {
+  verifyOtpResponse: VerifyOtpResponse
+  errors: [CheckAndVerifyRegistrationOtpError!]
+}
+
+"Type for result of return for Check OTP mutations."
+type CheckOtp {
+  "Is the member authenticated for the unique session key."
+  isAuthenticated: Boolean!
+}
+
+"Type for result of Check Registration OTP mutations."
+type CheckRegistrationOtp {
+  "Is the member authenticated for the unique session key."
+  isAuthenticated: Boolean!
+}
+
+type DuplicateMatchError implements Error {
+  message: String!
+}
+
+type InternalServerError implements Error {
+  message: String!
+}
+
+type KeyValuePairOfStringAndObject {
+  key: String!
+}
+
+type MatchResponse {
+  matchedPerson: MatchedPerson
+  errors: [MatchError!]
+}
+
+type MatchedPerson @key(fields: "personId racId") {
+  personId: ID!
+  racId: ID!
+  firstName: String!
+  mobilePhone: String
+  membershipType: String
+  """
+  Get OTP verification details for a matched
+  person for a unique MFA Journey Session Key.
+              
+  
+  **Returns:**
+  OtpVerificationDetails or null
+  """
+  otpVerificationDetails("MFA Journey Session Key" sessionKey: String!): OtpVerificationDetails @authorize(policy: "AzureAdPolicy") @cost(weight: "10")
+}
+
+type Mutation {
+  """
+  Get the matched person details for a given set of query params.
+              
+  
+  **Returns:**
+  MatchedPerson or null
+  """
+  match(input: MatchInput!): MatchResponse! @authorize(policy: "AzureAdPolicy") @cost(weight: "10")
+  """
+  Get the OTP Verification Details for an anonymous member that is
+  trying to register for myRAC for unique MFA Journey session key.
+              
+  
+  **Returns:**
+  OtpVerificationDetailsResponse or null
+  """
+  registrationOtpVerificationDetails("RACWA-CRM-ID" crmId: String! "Unique MFA Journey session key" key: String!): OtpVerificationDetailsResponse @authorize(policy: "AzureAdPolicy") @cost(weight: "10")
+  """
+  Get the OTP Verification Details for a logged-in
+  member for unique MFA Journey session key.
+              
+  
+  **Returns:**
+  OtpVerificationDetailsResponse or null
+  """
+  otpVerificationDetails("Unique MFA Journey session key" key: String!): OtpVerificationDetailsResponse @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  "Updated ADB2C account CRM ID by account ID."
+  updateAdAccountCrmId("The unique ADB2C account ID" adb2cAccountId: String! "The unique ID provided by our CRM software" crmId: String!): PatchAdb2cAccountResponse @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  "Update the email address for a ADB2C account."
+  updateAdAccountEmail(adAccountId: String! newEmailAddress: String!): ADB2CUserAccount @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  """
+  Send OTP to an anonymous member that is trying to
+  register for myRAC for unique MFA Journey session key.
+              
+  
+  **Returns:**
+  SendOtpResponse or null
+  """
+  sendRegistrationOtp(input: SendRegistrationOtpInput!): SendRegistrationOtpResponse! @authorize(policy: "AzureAdPolicy") @cost(weight: "10")
+  """
+  Send OTP code to a logged-in member for unique MFA Journey session key.
+              
+  
+  **Returns:**
+  SendOtpResponse or null
+  """
+  sendOtp(input: SendOtpInput!): SendOtpResponse! @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  """
+  Verify OTP code for an anonymous member that is trying
+  to register for myRAC for unique MFA Journey session key.
+              
+  
+  **Returns:**
+  VerifyOtpResponse or null
+  """
+  verifyRegistrationOtp(input: VerifyRegistrationOtpInput!): VerifyRegistrationOtpResponse! @authorize(policy: "AzureAdPolicy") @cost(weight: "10")
+  """
+  Verify OTP code for a logged-in member for unique MFA Journey session key.
+              
+  
+  **Returns:**
+  VerifyOtpResponse or null
+  """
+  verifyOtp(input: VerifyOtpInput!): VerifyOtpResponse! @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  """
+  Check if OTP status is verified for an anonymous member that is
+  trying to register for myRAC for unique MFA Journey session key.
+              
+  
+  **Returns:**
+  CheckRegistrationOtp or null
+  """
+  checkRegistrationOtp("RACWA-CRM-ID" crmId: String! "Unique MFA Journey session key" key: String!): CheckRegistrationOtp @authorize(policy: "AzureAdPolicy") @cost(weight: "10")
+  """
+  Check if OTP status is verified for a logged-in
+  member for unique MFA Journey session key.
+              
+  
+  **Returns:**
+  CheckOtp or null
+  """
+  checkOtp("Unique MFA Journey session key" key: String!): CheckOtp @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  """
+  Check if matched person is already authenticated for a unique
+  MFA journey session key and send OTP code if not authenticated.
+              
+  
+  **Returns:**
+  SendOtpResponse or null if person is already authenticated for session key
+  """
+  checkAndSendRegistrationOtp(input: CheckAndSendRegistrationOtpInput!): CheckAndSendRegistrationOtpResponse! @authorize(policy: "AzureAdPolicy") @cost(weight: "10")
+  """
+  Check if logged-in person is already authenticated for a unique
+  MFA journey session key and send OTP code if not authenticated.
+              
+  
+  **Returns:**
+  SendOtpResponse or null if person is already authenticated for session key
+  """
+  checkAndSendOtp(input: CheckAndSendOtpInput!): CheckAndSendOtpResponse! @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  """
+  Check if matched person is already authenticated for a unique 
+  MFA journey session key and verify OTP code if not authenticated.
+              
+  
+  **Returns:**
+  VerifyOtpResponse or null if person is already authenticated for session key
+  """
+  checkAndVerifyRegistrationOtp(input: CheckAndVerifyRegistrationOtpInput!): CheckAndVerifyRegistrationOtpResponse! @authorize(policy: "AzureAdPolicy") @cost(weight: "10")
+  """
+  Check if logged-in person is already authenticated for a unique
+  MFA journey session key and verify OTP code if not authenticated.
+              
+  
+  **Returns:**
+  VerifyOtpResponse or null if person is already authenticated for session key
+  """
+  checkAndVerifyOtp(input: CheckAndVerifyOtpInput!): CheckAndVerifyOtpResponse! @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  """
+  Update details for a logged-in Person.
+              
+  
+  **Returns:**
+  Person or null
+  """
+  updatePerson(input: UpdatePersonInput!): UpdatePersonResponse! @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+}
+
+type NoMatchError implements Error {
+  message: String!
+}
+
+type NotFoundError implements Error {
+  message: String!
+}
+
+"Type for result of get OTP Verification Details mutations."
+type OtpVerificationDetails {
+  """
+  MFA Journey Session Key (eg Registration, ManageContact).
+  A person (identified by CRM ID) can have multiple MFA journeys.
+  Key must be unique to ensure member data is secure across devices.
+  """
+  sessionKey: String!
+  "Is the member authenticated for the unique session key."
+  isAuthenticated: Boolean!
+  "Is phone number for OTP a mobile number."
+  isMobile: Boolean
+  "Suffix of the phone number the OTP code will be sent to."
+  phoneNumberSuffix: String
+}
+
+type OtpVerificationDetailsResponse {
+  "Is the member authenticated for the unique session key."
+  isAuthenticated: Boolean!
+  "Is phone number for OTP a mobile number."
+  isMobile: Boolean
+  "Suffix of the phone number the OTP code will be sent to."
+  phoneNumberSuffix: String
+}
+
+type PatchAdb2cAccountResponse {
+  isSuccessful: Boolean!
+}
+
+type Person @key(fields: "personId racId") {
+  personId: ID!
+  racId: ID!
+  firstName: String!
+  tier: String!
+  membershipCardNumber: String
+  membershipType: String!
+  title: String
+  middleName: String
+  surname: String
+  mobilePhone: String
+  homePhone: String
+  workPhone: String
+  personalEmailAddress: String
+  postalAddress: Address
+  """
+  Get OTP verification details for a logged-in
+  person for a unique MFA Journey Session Key.
+              
+  
+  **Returns:**
+  OtpVerificationDetails or null
+  """
+  otpVerificationDetails("MFA Journey Session Key" sessionKey: String!): OtpVerificationDetails @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+}
+
+"This logic should eventually be moved to a different subgraph, e.g. \"Utility\"."
+type Query {
+  """
+  Get Person details for a logged-in member.
+              
+  
+  **Returns:**
+  Person or null
+  """
+  me: Person @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  "Get ADB2C account by email."
+  adb2CUserAccount: ADB2CUserAccount @authorize(policy: "AzureAdB2CPolicy") @cost(weight: "10")
+  serviceIsAlive: ServiceIsAlive!
+  _service: _Service!
+  _entities(representations: [_Any!]!): [_Entity]!
+}
+
+type SendOtpResponse {
+  """
+  Does the member have remaining OTP send attempts
+  for the unique MFA journey session key.
+  """
+  hasSendAttemptsRemaining: Boolean
+  errors: [SendOtpError!]
+}
+
+type SendRegistrationOtpResponse {
+  sendOtpResponse: SendOtpResponse
+  errors: [SendRegistrationOtpError!]
+}
+
+type ServiceIsAlive @key(fields: "id") {
+  personService: Boolean! @cost(weight: "10")
+  mfaService: Boolean! @cost(weight: "10")
+  id: String!
+}
+
+type TooManyRequestsError implements Error {
+  message: String!
+}
+
+type UpdatePersonResponse {
+  person: Person
+  errors: [UpdatePersonError!]
+}
+
+type ValidationError implements Error {
+  message: String!
+  errors: [ValidationFailure]
+}
+
+type ValidationFailure {
+  propertyName: String
+  errorMessage: String
+  severity: Severity!
+  errorCode: String
+  formattedMessagePlaceholderValues: [KeyValuePairOfStringAndObject!]
+}
+
+type VerifyOtpResponse {
+  "Was the OTP code the member provided verified."
+  isVerified: Boolean
+  errors: [VerifyOtpError!]
+}
+
+type VerifyRegistrationOtpResponse {
+  verifyOtpResponse: VerifyOtpResponse
+  errors: [VerifyRegistrationOtpError!]
+}
+
+"This type provides a field named sdl: String! which exposes the SDL of the service's schema. This SDL (schema definition language) is a printed version of the service's schema including the annotations of federation directives. This SDL does not include the additions of the federation spec."
+type _Service {
+  sdl: String!
+}
+
+union CheckAndSendOtpError = InternalServerError | NotFoundError | TooManyRequestsError
+
+union CheckAndSendRegistrationOtpError = InternalServerError | NotFoundError | TooManyRequestsError
+
+union CheckAndVerifyOtpError = InternalServerError | NotFoundError | TooManyRequestsError
+
+union CheckAndVerifyRegistrationOtpError = InternalServerError | NotFoundError | TooManyRequestsError
+
+union MatchError = NoMatchError | DuplicateMatchError
+
+union SendOtpError = InternalServerError | NotFoundError | TooManyRequestsError
+
+union SendRegistrationOtpError = InternalServerError | NotFoundError | TooManyRequestsError
+
+union UpdatePersonError = ValidationError
+
+union VerifyOtpError = InternalServerError | NotFoundError | TooManyRequestsError
+
+union VerifyRegistrationOtpError = InternalServerError | NotFoundError | TooManyRequestsError
+
+"Union of all types that key directive applied. This information is needed by the Apollo federation gateway."
+union _Entity = MatchedPerson | Person | ServiceIsAlive
+
+input AddressInput {
+  buildingName: String
+  subBuildingNumber: String
+  unitNumber: String
+  lotNumber: String
+  houseNumber: String
+  streetName: String
+  poBox: String
+  suburb: String
+  state: String
+  postcode: String
+  country: String
+  dpid: String
+}
+
+input CheckAndSendOtpInput {
+  "Unique MFA Journey session key"
+  key: String!
+  "Channel OTP code will be sent via"
+  channel: OtpChannel!
+}
+
+input CheckAndSendRegistrationOtpInput {
+  "RACWA-CRM-ID"
+  crmId: String!
+  "Unique MFA Journey session key"
+  key: String!
+  "Channel OTP code will be sent via"
+  channel: OtpChannel!
+}
+
+input CheckAndVerifyOtpInput {
+  "Unique MFA Journey session key"
+  key: String!
+  "OTP verification code"
+  code: String!
+}
+
+input CheckAndVerifyRegistrationOtpInput {
+  "RACWA-CRM-ID"
+  crmId: String!
+  "Unique MFA Journey session key"
+  key: String!
+  "OTP verification code"
+  code: String!
+}
+
+input MatchInput {
+  request: MatchPersonRequestInput!
+}
+
+input MatchPersonRequestInput {
+  firstName: String!
+  dateOfBirth: String!
+  surname: String!
+  mobilePhone: String
+  racId: String
+  productNumber: String
+}
+
+input SendOtpInput {
+  "Unique MFA Journey session key"
+  key: String!
+  "OTP Channel verification code will be sent via"
+  channel: OtpChannel!
+}
+
+input SendRegistrationOtpInput {
+  "RACWA-CRM-ID"
+  crmId: String!
+  "Unique MFA Journey session key"
+  key: String!
+  "OTP Channel verification code will be sent via"
+  channel: OtpChannel!
+}
+
+input UpdatePersonInput {
+  request: UpdatePersonRequestInput!
+}
+
+input UpdatePersonRequestInput {
+  firstName: String
+  title: String
+  middleName: String
+  surname: String
+  mobilePhone: String
+  homePhone: String
+  workPhone: String
+  personalEmailAddress: String
+  postalAddress: AddressInput
+}
+
+input VerifyOtpInput {
+  "Unique MFA Journey session key"
+  key: String!
+  "OTP verification code"
+  code: String!
+}
+
+input VerifyRegistrationOtpInput {
+  "RACWA-CRM-ID"
+  crmId: String!
+  "Unique MFA Journey session key"
+  key: String!
+  "OTP verification code"
+  code: String!
+}
+
+"Defines when a policy shall be executed."
+enum ApplyPolicy {
+  "Before the resolver was executed."
+  BEFORE_RESOLVER
+  "After the resolver was executed."
+  AFTER_RESOLVER
+  "The policy is applied in the validation step before the execution."
+  VALIDATION
+}
+
+enum OtpChannel {
+  SMS
+  CALL
+}
+
+enum Severity {
+  ERROR
+  WARNING
+  INFO
+}
+
+"The authorize directive."
+directive @authorize("The name of the authorization policy that determines access to the annotated resource." policy: String "Roles that are allowed to access the annotated resource." roles: [String!] "Defines when when the authorize directive shall be applied.By default the authorize directives are applied during the validation phase." apply: ApplyPolicy! = BEFORE_RESOLVER) repeatable on OBJECT | FIELD_DEFINITION
+
+"The purpose of the `cost` directive is to define a `weight` for GraphQL types, fields, and arguments. Static analysis can use these weights when calculating the overall cost of a query or response."
+directive @cost("The `weight` argument defines what value to add to the overall cost for every appearance, or possible appearance, of a type, field, argument, etc." weight: String!) on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | ENUM | INPUT_FIELD_DEFINITION
+
+"Used to indicate a combination of fields that can be used to uniquely identify and fetch an object or interface."
+directive @key(fields: FieldSet! resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
+
+"Links definitions within the document to external schemas."
+directive @link("Gets imported specification url." url: String! "Gets optional list of imported element names." import: [String!]) repeatable on SCHEMA
+
+"The `@specifiedBy` directive is used within the type system definition language to provide a URL for specifying the behavior of custom scalar definitions."
+directive @specifiedBy("The specifiedBy URL points to a human-readable specification. This field will only read a result for scalar types." url: String!) on SCALAR
+
+"Scalar representing a set of fields."
+scalar FieldSet
+
+scalar UUID @specifiedBy(url: "https:\/\/tools.ietf.org\/html\/rfc4122")
+
+"The _Any scalar is used to pass representations of entities from external services into the root _entities field for execution. Validation of the _Any scalar is done by matching the __typename and @external fields defined in the schema."
+scalar _Any

@@ -1,0 +1,258 @@
+name: Build Supergraph
+description: Builds a new supergraph.graphql file
+
+inputs:
+  environment:
+    required: true
+    type: string
+  dotnet-version:
+    default: '8.0.x'
+  npm-token:
+    required: true
+    type: string
+  nuget-token:
+    required: true
+    type: string
+  container-app-name:
+    required: true
+    type: string
+  upload-supergraph:
+    required: false
+    type: boolean
+    default: true
+  should-restart-container:
+    required: false
+    type: boolean
+    default: true
+
+runs:
+  using: 'composite'
+
+  steps:
+    - name: 🦺 Setup
+      uses: ./.github/actions/setup
+      with:
+        npm-token: ${{ inputs.npm-token }}
+
+    - name: 🦺 Setup .NET ${{ inputs.dotnet-version }} Environment
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      env:
+        NUGET_AUTH_TOKEN: ${{ inputs.nuget-token }}
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+        cache: true
+        cache-dependency-path: |
+          backend/subgraphs/**/packages.lock.json
+        source-url: https://pkgs.dev.azure.com/racwa/_packaging/RACI_Integration_Feed/nuget/v3/index.json
+
+    - name: 🔍 Get AppInsights connection string
+      id: getAppInsightsConnectionString
+      uses: ./.github/actions/get-keyvault-secret
+      with:
+        keyvault_name: 'next-rac-vault-${{ inputs.environment }}'
+        secret_name: app-insights-connection-string
+
+    - name: 🛠️ Replace connection string in appsettings.json
+      shell: bash
+      run: |
+        CONNECTION_STRING="${{ steps.getAppInsightsConnectionString.outputs.secret }}"
+
+        for appsettings in $(find ./backend/subgraphs/ -type f -name "appsettings.json"); do
+            jq --arg new_value "$CONNECTION_STRING" '.AzureMonitor.ConnectionString = $new_value' "$appsettings" > tmp.$$.json && mv tmp.$$.json "$appsettings"
+            echo "Updated connection strings in $appsettings"
+        done
+
+        echo "AzureMonitor.ConnectionString replaced in all appsettings.json files."
+
+        for appsettings in $(find ./backend/subgraphs/ -type f -name "appsettings.local.json"); do
+            sed -i 's/-dev./-${{ inputs.environment }}./g' "$appsettings"
+            jq --arg new_value "$CONNECTION_STRING" '.AzureMonitor.ConnectionString = $new_value' "$appsettings" > tmp.$$.json && mv tmp.$$.json "$appsettings"            
+
+            echo "Updated connection strings in $appsettings"
+        done
+
+        echo "Connection strings replaced in all appsettings.local.json files."
+
+    - name: 🔄 Restore dependencies
+      shell: bash
+      run: dotnet restore ./backend/subgraphs/subgraphs.sln --locked-mode
+
+    - name: 🍻 Install Dependencies
+      shell: bash
+      run: |
+        dotnet restore backend/subgraphs/Insurance --locked-mode
+        dotnet restore backend/subgraphs/Membership --locked-mode 
+        dotnet restore backend/subgraphs/Motoring --locked-mode 
+        dotnet restore backend/subgraphs/Person --locked-mode
+
+    - name: 🚀 Find and run all projects in solution
+      env:
+        CI: true
+      shell: bash
+      run: |
+        # Find all .csproj files in the solution directory
+        PROJECTS=$(dotnet sln ./backend/subgraphs/subgraphs.sln list | grep '\.csproj' | grep -v '\.Tests/' | awk '{print $1}')
+        echo "Raw Projects: $PROJECTS"
+
+        # Loop through each project path and run it
+        echo "$PROJECTS" | while IFS= read -r project; do
+          # Extract the project path (make sure to avoid extra spaces)
+          PROJECT_PATH=$(echo "$project" | awk '{print $1}')
+
+          # Remove the .csproj extension to get the project directory path
+          PROJECT_DIR=$(dirname "$PROJECT_PATH")
+
+          if [ -n "$PROJECT_PATH" ]; then
+            # Debugging: Print the project path
+            echo "Running project: $PROJECT_PATH"
+            dotnet run --project "./backend/subgraphs/$PROJECT_PATH" --no-restore -c Release &
+
+            # Find launchSettings.json in the project's Properties folder
+            LAUNCH_SETTINGS="./backend/subgraphs/$PROJECT_DIR/Properties/launchSettings.json"
+
+            if [ -f "$LAUNCH_SETTINGS" ]; then
+              # Extract the applicationUrl
+              APP_URL=$(jq -r '.profiles[].applicationUrl' "$LAUNCH_SETTINGS")
+
+              # Debugging: Print the extracted application URL
+              echo "Application URL for $PROJECT_DIR: $APP_URL"
+
+              # Extract the port from the URL (assuming it's of the form http://localhost:<port>)
+              PORT=$(echo "$APP_URL" | grep -oP ':\K[0-9]+')
+
+              echo "Waiting for the project $PROJECT_DIR to be ready on $APP_URL..."
+
+              timeout=30  # Maximum wait time in seconds
+              interval=5  # Interval to check the port
+              service_url="$APP_URL/graphql/"
+
+              # Wait for the project to start on the specified port
+              while ! nc -z localhost $PORT; do
+                timeout=$((timeout - interval))
+                if [ $timeout -le 0 ]; then
+                  echo "The project $PROJECT_DIR failed to start within the time limit."
+                  echo "Service is not running on $service_url"
+                  exit 1
+                fi
+                echo "Waiting for the project to start on port $PORT..."
+                sleep $interval
+              done
+
+              # Check if the service is accessible via the /graphql endpoint
+              if curl -s --head --request GET $service_url | grep "200 OK" > /dev/null; then
+                echo "The project $PROJECT_DIR is running and accessible at $service_url"
+              else
+                echo "The project $PROJECT_DIR is running on port $PORT, but the /graphql endpoint is not accessible."
+              fi
+
+            else
+              echo "No launchSettings.json found for $PROJECT_DIR. Skipping port check."
+            fi
+
+          else
+            echo "No project found to run."
+          fi
+        done
+
+    - name: ⏳ Wait for all projects to finish
+      shell: bash
+      run: wait
+
+    - name: 🛠️ Compose the SuperGraph Gateway
+      working-directory: ./backend/gateway
+      shell: bash
+      run: pnpm run ci:compose
+
+    - name: 🛑 Stop all running .NET projects
+      shell: bash
+      run: |
+        echo "Stopping all .NET processes..."
+        pkill -f 'dotnet' || true
+
+    - name: 🔗 Update SuperGraph Graph's url
+      shell: bash
+      run: |
+        # Find all .csproj files in the solution directory
+        PROJECTS=$(dotnet sln ./backend/subgraphs/subgraphs.sln list | grep '\.csproj' | grep -v '\.Tests/' | awk '{print $1}')
+        echo "Raw Projects: $PROJECTS"
+
+        # Loop through each project path and run it
+        echo "$PROJECTS" | while IFS= read -r project; do
+          # Extract the project path (make sure to avoid extra spaces)
+          PROJECT_PATH=$(echo "$project" | awk '{print $1}')
+
+          # Remove the .csproj extension to get the project directory path
+          PROJECT_DIR=$(dirname "$PROJECT_PATH")
+
+          if [ -n "$PROJECT_PATH" ]; then
+            # Find launchSettings.json in the project's Properties folder
+            LAUNCH_SETTINGS="./backend/subgraphs/$PROJECT_DIR/Properties/launchSettings.json"
+
+            if [ -f "$LAUNCH_SETTINGS" ]; then
+              # Extract the applicationUrl
+              APP_URL=$(jq -r '.profiles[].applicationUrl' "$LAUNCH_SETTINGS")
+
+              # Debugging: Print the extracted application URL
+              echo "Application URL for $PROJECT_DIR: $APP_URL"
+
+              # Convert PROJECT_DIR to lowercase
+              PROJECT_DIR_LOWER=$(echo "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')
+
+              # Define the replacement URL
+              REPLACEMENT_URL="http://${PROJECT_DIR_LOWER}-subgraph"
+              
+              # Debugging: Print the replacement URL
+              echo "Replacing $APP_URL with $REPLACEMENT_URL"
+
+              # Perform the replacement on (e.g., a config file)
+              TARGET_FILE="./backend/gateway/supergraph.graphql"
+
+              # Replace APP_URL with REPLACEMENT_URL in the target file
+              sed -i "s|$APP_URL|$REPLACEMENT_URL|g" "$TARGET_FILE"
+              
+              # Debugging: Verify the replacement
+              grep "$REPLACEMENT_URL" "$TARGET_FILE" || echo "URL replacement failed in $TARGET_FILE"
+
+            else
+              echo "No launchSettings.json found for $PROJECT_DIR."
+            fi
+
+          else
+            echo "No project found."
+          fi
+        done
+
+    - name: 🔑 Get Supergraph Encryption Key
+      id: getSupergraphEncryptionKey
+      uses: ./.github/actions/get-keyvault-secret
+      with:
+        keyvault_name: 'next-rac-vault-${{ inputs.environment }}'
+        secret_name: 'SUPERGRAPH-ENCRYPTION-KEY'
+
+    - name: 🔐 Encrypt & Encode Supergraph File
+      shell: bash
+      run: |
+        gpg --symmetric --cipher-algo AES256 --passphrase ${{ steps.getSupergraphEncryptionKey.outputs.secret }} --batch --yes -o supergraph.graphql.gpg ./backend/gateway/supergraph.graphql
+        base64 supergraph.graphql.gpg > supergraph.graphql
+
+    - name: 🚀 Upload Supergraph to Blob Storage
+      if: ${{ inputs.upload-supergraph == 'true' }}
+      shell: pwsh
+      run: |
+        az storage blob upload --account-name 'racdigitalstore${{ inputs.environment }}' --container-name 'supergraph-gateway' --name 'supergraph.graphql' --file 'supergraph.graphql' --auth-mode login --overwrite
+
+        if ("${{ inputs.should-restart-container }}" -eq "true") {
+          Write-Host "Container app will be restarted."
+
+          $ActiveRevision = az containerapp revision list --name ${{ inputs.container-app-name }} --resource-group "rg-next-rac-com-au-${{ inputs.environment }}" --query "[?properties.active].name | [0]" -o tsv
+
+          if (-not $ActiveRevision) {
+              Write-Output "No active revision found."
+              exit 1
+          }
+
+          Write-Output "Active revision: $ActiveRevision"
+          az containerapp revision restart --name ${{ inputs.container-app-name }} --resource-group "rg-next-rac-com-au-${{ inputs.environment }}" --revision $ActiveRevision
+        } else {
+          Write-Host "Container app will not be restarted."
+        }

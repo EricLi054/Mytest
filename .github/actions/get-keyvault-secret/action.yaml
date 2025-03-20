@@ -9,10 +9,6 @@ inputs:
   secret_name:
     required: true
     type: string
-  perform_azure_login:
-    required: false
-    default: false
-    type: boolean
 
 outputs:
   secret:
@@ -23,21 +19,11 @@ runs:
   using: "composite"
 
   steps:
-    - name: Azure Login
-      if: inputs.perform_azure_login == 'true'
-      uses: Azure/login@v1.1
-      with:
-        allow-no-subscriptions: true
-        creds: ${{ env.AZURE_CREDENTIALS }}
-
     - name: Get Secret
       id: getSecret
-      uses: azure/CLI@v1
+      uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2
       with:
-        azcliversion: 2.51.0
         inlineScript: |
           value=$(az keyvault secret show --name ${{ inputs.secret_name }} --vault-name ${{ inputs.keyvault_name }} --query value --output tsv)
           echo "::add-mask::$value"
           echo "secret=$value" >> "$GITHUB_OUTPUT"
-
-

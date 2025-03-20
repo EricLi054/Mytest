@@ -1,0 +1,227 @@
+name: Create Release Notes
+description: Creates release notes in the GitHub Summary for an application within a monorepo
+
+inputs:
+  application_name:
+    description: The application name
+    required: true
+  git_tag_name:
+    description: The github tag name for the application
+    required: true
+  application_directory:
+    description: The directory of the application for which we are building release notes for (e.g. 'frontend/apps/motoring')
+    required: true
+  shared_resources:
+    description: A comma delimited list of shared files or folders that impacts this application (e.g. 'package.json,frontend/apps/packages')
+    required: true
+  version:
+    description: The version for the upcoming release
+    required: true
+
+outputs:
+  release-notes:
+    description: The release notes exported as a string
+    value: ${{ steps.release-notes.outputs.release-notes }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create Release Notes
+      id: release-notes
+      shell: pwsh
+      run: |
+        # ------------------------------------------------------------------- #
+        #                 Find Commits Since the Last Release                 #
+        # ------------------------------------------------------------------- #
+
+        git fetch --tags
+
+        $existingTags = @(git tag -l "${{ inputs.git_tag_name }}*" | Where-Object { $_ -notmatch "-Next" })
+        $existingTagDates = @{}
+        $lastProductionSha = ""
+               
+        foreach ($tag in $existingTags) {
+            $commitDate = git for-each-ref --sort=-creatordate --format '%(creatordate:iso8601)' refs/tags/$tag
+            $existingTagDates[$tag] = [datetime]$commitDate
+        }
+
+        if ($existingTagDates.Count -eq 0) {
+            $lastProductionSha = git rev-list --max-parents=0 HEAD
+        } else {
+            $lastProductionTag = $existingTagDates.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 1
+            $lastProductionTagName = $lastProductionTag.Key
+            $lastProductionSha = git rev-list -n 1 $lastProductionTagName
+        }
+
+        $newVersion = git rev-parse HEAD
+        $listOfCommits = @(git log "${lastProductionSha}...${newVersion}" --oneline)
+
+        $applicationDirectoryPrefix = "${{ inputs.application_directory }}"
+        $listSharedResources = ("${{ inputs.shared_resources }}").Split(",")
+
+        # ----------------------------------------------------------------------- #
+        #                 Create More Detailed Commit Information                 #
+        # ----------------------------------------------------------------------- #
+        $jiraBaseUrl = "https://rac-wa.atlassian.net"
+
+        $jiraTicketPattern = "(^|[^A-Za-z])([A-Za-z]{2,4}(-| )[0-9]{1,})"
+        $renovatePattern = "(Renovate)"
+        $pullRequestRegex = "(\(#[0-9]{1,}\)|Merged In.*pull request|Merge pull request #)"
+        $lineCommitSplitPattern = '^(\w+)\s+([A-Z]{2,4}-\d+):?\s*(?:\(([^)]+)\):?\s*)?(.*?)(\s*\(#[^\)]+\))$'
+
+        $listOfTickets = @()
+        $listOfCommitsWithoutTickets = @()
+
+        $listOfCommits | ForEach-Object {
+          if ($_ -match $jiraTicketPattern -and ($_ -notmatch $renovatePattern)) {
+            $jiraTicket = $matches[0].ToUpper().Trim().Replace(" ", "-") -replace '[^\w-]', ''
+            if ($_ -match $lineCommitSplitPattern) {
+              $commitMergeDate = git show -s --format=%ct  $matches[1]
+              $timeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("W. Australia Standard Time")
+              $convertedMergeDateTime = ([System.TimeZoneInfo]::ConvertTimeFromUtc([System.DateTimeOffset]::FromUnixTimeSeconds($commitMergeDate).UtcDateTime, $timeZone)).ToString("yyyy-MM-dd hh:mmtt")
+
+              $commitSha = $_.Split(" ")[0]
+              $filesTouched = @(git diff-tree --no-commit-id --name-only -r $commitSha)
+              $impactType = "NONE"
+
+              if ($filesTouched | Where-Object { $_ -like "$($applicationDirectoryPrefix)/*" }) {
+                $impactType = "DIRECT"
+              } else {
+                $indirectImpact = $filesTouched | Where-Object {
+                    $filePath = $_
+                    $listSharedResources -contains ($listSharedResources | Where-Object { $filePath -like "$_*" })
+                }
+                if ($indirectImpact) {
+                    $impactType = "INDIRECT"
+                }
+              }
+
+              $listOfTickets += [PSCustomObject]@{
+                CommitHash = $matches[1]
+                Ticket = $jiraTicket.Trim()
+                Description = $matches[4].Trim().Replace("|", " ")
+                PR = $matches[5].Trim()
+                MergeDate = $convertedMergeDateTime
+                Impact = $impactType
+              }
+            } else {
+              $listOfTickets += [PSCustomObject]@{
+                CommitHash = "UNKNOWN"
+                Ticket = $jiraTicket.Trim().Replace("|", " ")
+                Description = $_
+                PR = "UNKNOWN"
+                MergeDate = "UNKNOWN"
+                Impact = $impactType
+              }
+            }
+          } else {
+            $listOfCommitsWithoutTickets += $_
+          }
+        }
+
+        $repositoryName = (git config --get remote.origin.url) -replace '^.*/([^/]+)\.git$', '$1'
+
+        $oldProductionCodeUrl = "$($repositoryName)/tree/" + $lastProductionSha
+        $newProductionCodeUrl = "$($repositoryName)/tree/" + $newVersion
+        $releaseCodeComparisonUrl = "$($repositoryName)/compare/$($lastProductionSha)...$($newVersion)"
+
+        # ----------------------------------------------------- #
+        #                 Display Release Notes                 #
+        # ----------------------------------------------------- #
+        $Summary = ""
+        $Summary += "## Release Notes`n"
+        $Summary += "|       Repository Code Snapshot - Previous Version          |     Repository Code Snapshot - This Version         |`n"
+        $Summary += "| ---------------------------------------------------------- | --------------------------------------------------- |`n"
+        $Summary += "|       [$($lastProductionSha)]($oldProductionCodeUrl)       |     [$($newVersion)]($newProductionCodeUrl)         |`n`n"
+        $Summary += "**[Click here to see a repository code snapshot comparison]($($releaseCodeComparisonUrl))**`n"
+        $Summary += "&nbsp;`n`n`n"
+
+        $applicationName = "${{ inputs.application_name }}"
+        $Summary += "### $($applicationName) v${{ inputs.version }} Changes`n"
+        $Summary += "The commits outlined below are changes that have been made directly to the $applicationName application.`n"
+        $Summary += "| Ticket | Pull Request Description | Pull Request | Commit | Commit Merge Date |`n"
+        $Summary += "| ------ | ------------------------ | ------------ | ------ | ----------------- |`n"
+
+        $listOfTickets | ForEach-Object {
+          if ($_.Impact -eq "DIRECT") {
+            $jiraUrl = "$($jiraBaseUrl)/browse/$($_.Ticket)"
+            $description = $_.Description.Substring(0, 1).ToUpper() + $_.Description.Substring(1)
+
+            if ($_.CommitHash -eq "UNKNOWN") {
+              $Summary += "| [$($_.Ticket)]($($jiraUrl)) | $($description) | | | |`n"
+            } else {
+              $prDisplay = $_.PR.Replace("(", "").Replace(")", "")
+              $prUrl = "$($repositoryName)/pull/" + $_.PR.Replace("(#", "").Replace(")", "")
+              $commitUrl = "$($repositoryName)/commit/" + $_.CommitHash
+              $Summary += "| [$($_.Ticket)]($($jiraUrl)) | $($description) | [$($prDisplay)]($($prUrl)) | [$($_.CommitHash)]($commitUrl) | $($_.MergeDate) |`n"
+            }
+          }
+        }
+
+        $Summary += "`n`n"
+        $Summary += "### Shared Code Changes`n"
+        $Summary += "<details>`n"
+        $Summary += "<summary>Click here to expand view the list of commits brought into this release because of shared code changes</summary>`n`n`n"
+        $Summary += "| Ticket | Pull Request Description | Pull Request | Commit | Commit Merge Date |`n"
+        $Summary += "| ------ | ------------------------ | ------------ | ------ | ----------------- |`n"
+
+        $listOfTickets | ForEach-Object {
+          if ($_.Impact -eq "INDIRECT") {
+            $jiraUrl = "$($jiraBaseUrl)/browse/$($_.Ticket)"
+            $description = $_.Description.Substring(0, 1).ToUpper() + $_.Description.Substring(1)
+
+            if ($_.CommitHash -eq "UNKNOWN") {
+              $Summary += "| [$($_.Ticket)]($($jiraUrl)) | $($description) | | | |`n"
+            } else {
+              $prDisplay = $_.PR.Replace("(", "").Replace(")", "")
+              $prUrl = "$($repositoryName)/pull/" + $_.PR.Replace("(#", "").Replace(")", "")
+              $commitUrl = "$($repositoryName)/commit/" + $_.CommitHash
+              $Summary += "| [$($_.Ticket)]($($jiraUrl)) | $($description) | [$($prDisplay)]($($prUrl)) | [$($_.CommitHash)]($commitUrl) | $($_.MergeDate) |`n"
+            }
+          }
+        }
+        $Summary += "</details>`n"
+
+        $jql = " in (%TICKETS%"
+        $jqlTickets = ""
+        $listOfTickets | ForEach-Object {
+          if ($_.Impact -ne "NONE") {         
+            if ($_.Ticket -ne "") {
+              if ($jqlTickets -eq "") {
+                  $jqlTickets += '"' + $_.Ticket + '"'
+              } else {
+                  $jqlTickets += ',"' + $_.Ticket + '"'
+              }
+            }
+          }
+        }
+
+        $jql = $jql.Replace("%TICKETS%", $jqlTickets) + ")"
+        $encodedJqlUrl = "$($jiraBaseUrl)/issues/?jql=issue" + [System.Web.HttpUtility]::UrlEncode($jql)
+
+        $Summary += "`n`n"
+        $Summary += "**[Click here to see a detailed report in Jira]($($encodedJqlUrl))** - Includes both application and shared code changes`n"
+        $Summary += "`n`n"
+
+        if ($listOfCommitsWithoutTickets.length -gt 0) {
+          $Summary += "### Requires Attention`n"
+          $Summary += "<details>`n"
+          $Summary += "<summary>There are commits and/or pull requests in this release without linked Jira tickets, click here to expand and investigate</summary>`n`n`n"
+          
+          $listOfCommitsWithoutTickets | ForEach-Object {
+            if ($_ -match '\(#(\d+)\)') {
+              $prNumber = $matches[1]
+              $prUrl = "$($repositoryName)/pull/$($prNumber)"
+              $Summary += "- [$($_)]($($prUrl))`n"
+            } else {
+              $Summary += "- $($_)`n"
+            }
+          }
+          $Summary += "`n`n"
+          $Summary += "</details>`n`n"
+        }
+
+        $EscapedReleaseNotes = $Summary -Replace '"', "'"
+        $EscapedReleaseNotes = $EscapedReleaseNotes -Replace '%', '%25' -Replace "`n", '%0A' -Replace "`r", '%0D'
+        echo "release-notes=$EscapedReleaseNotes" >> $env:GITHUB_OUTPUT
+        $Summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append

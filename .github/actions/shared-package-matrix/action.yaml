@@ -1,0 +1,45 @@
+name: Detect Changes in Shared Packages
+description: Detects changed shared packages for the frontend apps
+
+outputs:
+  affected-packages:
+    description: 'List of affected packages'
+    value: ${{ steps.detect.outputs.affected-packages }}
+  has-affected-packages:
+    description: 'Boolean indicating if there are affected packages'
+    value: ${{ steps.detect.outputs.has-affected-packages }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🛎️ Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      with:
+        fetch-depth: 0
+
+    - name: 📂 Get changed shared packages
+      id: detect
+      shell: bash
+      run: |
+        CHANGED_FILES=$(git diff --name-only origin/main...HEAD -- frontend/packages/ | cut -d'/' -f3 | sort -u)
+
+        AFFECTED_PACKAGES=()
+        for folder in $CHANGED_FILES; do
+          AFFECTED_PACKAGES+=("@racwa/$folder")
+        done
+
+        if [ ${#AFFECTED_PACKAGES[@]} -eq 0 ]; then
+          AFFECTED_PACKAGES="[]"
+          echo "has-affected-packages=false" >> "$GITHUB_OUTPUT"
+        else
+          AFFECTED_PACKAGES=$(printf '%s\n' "${AFFECTED_PACKAGES[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "has-affected-packages=true" >> "$GITHUB_OUTPUT"
+        fi
+
+        echo "affected-packages=${AFFECTED_PACKAGES}" >> "$GITHUB_OUTPUT"
+
+    - name: 🛠️ Debug affected packages output
+      shell: bash
+      run: |
+        echo "Affected packages JSON: ${{ steps.detect.outputs.affected-packages }}"
+        echo "Has Affected packages: ${{ steps.detect.outputs.has-affected-packages }}"

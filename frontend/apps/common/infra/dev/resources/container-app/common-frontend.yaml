@@ -1,0 +1,33 @@
+common-frontend:
+  properties:
+    configuration:
+      ingress:
+        customDomains:
+          - name: common-frontend-dev.ractest.com.au
+            certificateBindingType: SniEnabled
+            certificateName: ractest-wildcard-2024
+      registries:
+        - server: racwa.azurecr.io
+          username: ''
+          passwordSecretRef: ''
+          identity: /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe
+    template:
+      containers:
+        - image: racwa.azurecr.io/rac-digital/common-frontend
+          name: common-frontend
+          resources:
+            cpu: 0.25
+            memory: 0.5Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          env:
+            - name: CONTAINER_APP_ENV
+              value: 'dev'
+      scale:
+        minReplicas: 2
+        maxReplicas: 2
+
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+      - /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "env": [
+        "CONTAINER_APP_ENV",
+        "GRAPHQL_ENDPOINT",
+        "NEXTAUTH_URL",
+        "NEXTAUTH_SECRET",
+        "REDIS_HOST",
+        "CONTENTFUL_YOUR_VEHICLE_ID",
+        "CONTENTFUL_UPDATE_VEHICLE_ID",
+        "CONTENTFUL_CONFIRM_VEHICLE_ID",
+        "CONTENTFUL_SYSTEM_UNAVAILABLE_ID",
+        "CONTENTFUL_CHANGE_ALREADY_MADE_ID",
+        "CONTENTFUL_UPDATE_NOT_ALLOWED_ID",
+        "CONTENTFUL_CONFIRMATION_ID"
+      ],
+      "outputs": [".next/**", "!.next/cache/**", "next-env.d.ts"]
+    },
+    "dev": {
+      "persistent": true
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "env": [
+        "GRAPHQL_ENDPOINT",
+        "AZURE_CLIENT_ID",
+        "AZURE_MANAGEMENT_APPLICATION_ID",
+        "REDIS_HOST",
+        "REDIS_PASSWORD",
+        "NEXTAUTH_URL",
+        "NEXTAUTH_SECRET",
+        "MY_RAC_HOMEPAGE_URL",
+        "MS_GRAPH_TENANT",
+        "MS_GRAPH_CLIENT_ID",
+        "MS_GRAPH_SECRET",
+        "MAILOSAUR_API_AUTH",
+        "MAILOSAUR_SERVER",
+        "IDENTITY_PLAYWRIGHT_EMAIL",
+        "IDENTITY_PLAYWRIGHT_PASSWORD"
+      ],
+      "outputs": [".next/**", "!.next/cache/**", "next-env.d.ts"]
+    },
+    "dev": {
+      "persistent": true
+    }
+  }
+}

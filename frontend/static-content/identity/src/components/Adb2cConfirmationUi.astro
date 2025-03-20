@@ -1,0 +1,56 @@
+---
+// ADB2C Confirmation UI
+
+// Scripts to uplift the experience provided by Microsoft
+// to the RAC designed one.
+
+// A `getPageDetails() => { url: string, title: string }` function should be
+// defined by the consuming page to get analytics events sent.
+
+import Reference from "./Reference.astro";
+import thumbsUp from "../../public/icons/thumbs-up.svg";
+
+interface Props {
+  /** The label for the Continue button */
+  confirmationContinueLabel: string;
+}
+
+const { confirmationContinueLabel } = Astro.props as Props;
+---
+
+<>
+  <Reference
+    id="refConfirmationContinueLabel"
+    value=`${confirmationContinueLabel}`
+  />
+  <Reference id="refThumbsUp" value=`${thumbsUp.src}` />
+</>
+
+<script is:inline>
+  var confirmationSetInterval = setInterval(watchForConfirmation, 30);
+
+  function watchForConfirmation() {
+    if (isElementVisible("#hasChangedPassword_label")) {
+      clearInterval(confirmationSetInterval);
+      $("#pageTitle").html("Done!");
+      $("title").html("Confirmation | myRAC registration");
+      sendGtmPageView(getPageDetails());
+
+      var buttonLabel = $("#refConfirmationContinueLabel").html();
+      $("#content-box").hide();
+      $("#continue").html(buttonLabel);
+      $("#continue").on("click", function () {
+        sendGtmCustomEvent(buttonLabel, getPageDetails());
+      });
+      $("#cancel").hide();
+      $("#racLogo").after(
+        `<img id="successIcon" style="width: 100px; height: 100px; margin-top: 40px; margin-bottom: 10px" src="${$("#refThumbsUp").text()}" />`,
+      );
+      $(".buttons").insertAfter("#pageTitle");
+      $(".buttons").css({ width: "100%" });
+      $("#hasChangedPassword_label").insertAfter("#pageTitle");
+      $("#hasChangedPassword_label").html("Your password has been reset.");
+      $("#hasChangedPassword_label").css({ "margin-bottom": "26px" });
+    }
+  }
+</script>

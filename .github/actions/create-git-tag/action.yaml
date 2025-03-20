@@ -1,0 +1,79 @@
+name: Create Git Tag
+description: Creates a Git Tag
+
+inputs:
+  application:
+    description: Name of the application that is used in the prefix for the tag (e.g. Motoring.Subgraph)
+    required: true
+  is_production:
+    description: If this tag is going to have a production annotation, and a GitHub release will be created
+    required: true
+    type: boolean
+  release_notes:
+    description: Release notes to attach to the GitHub release.
+    required: false
+    type: string
+
+outputs:
+  version:
+    description: The version of the application
+    value: ${{ steps.create-git-tag.outputs.version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create Git Tag
+      id: create-git-tag
+      shell: pwsh
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "github-actions@ractest.com.au"
+        git fetch --tags
+
+        $existingTags = @(git tag -l "${{ inputs.application }}*" | Where-Object { $_ -notmatch "-Next" })
+        $newVersion = "$($existingTags.Count +1).$(${{ github.run_number }})"
+
+        $isMain = if ($env:GITHUB_REF -eq 'refs/heads/main') { 'true' } else { 'false' }
+
+        if ($isMain -eq $true) {
+          $date = Get-Date -Format "yyyy-MM-dd"
+          $gitTag = ""
+          $gitAnnotation = ""
+
+          if ("${{ inputs.is_production }}" -eq $true) {
+            $gitTag = "${{ inputs.application }}-$($newVersion)" 
+            $gitAnnotation = "v$($newVersion) - $($date) - (Production Release)"
+          } else {
+            $gitTag = "${{ inputs.application }}-Next"
+            $gitAnnotation = "v$($newVersion) - $($date) - (Next Release)"
+          }
+
+          git tag -a $gitTag -m $gitAnnotation -f
+          git push origin $gitTag -f
+        }
+
+        echo "version=$($newVersion)" >> $env:GITHUB_OUTPUT
+        exit 0;
+
+    - name: Create GitHub Release
+      if: ${{ inputs.is_production == 'true' }}
+      shell: pwsh
+      run: |
+        $workflowName = "${{ github.workflow }}"
+        $workflowRunNumber = "${{ github.run_number }}"
+        $workflowRunBranch = "${{ github.ref_name }}"
+        $workflowRunCommitHash = "${{ github.sha }}"
+        $workflowRunUrl = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+        $ReleaseNotes = ""
+        $ReleaseNotes = "## Workflow Information`n"
+        $ReleaseNotes += "Below is the information of the workflow that created this release.`n`n"
+        $ReleaseNotes += "|                          | $($workflowName) - (Run Number $($workflowRunNumber))  |`n"
+        $ReleaseNotes += "| ------------------------ | ------------------------------------------------------ |`n"
+        $ReleaseNotes += "| **Workflow**             | $($workflowRunUrl)                                     |`n"
+        $ReleaseNotes += "| **Branch**               | $($workflowRunBranch)                                  |`n"
+
+        $ReleaseNotes += "${{ inputs.release_notes }}"
+        $ReleaseNotes = $ReleaseNotes -Replace '%25', '%' -Replace '%0A', "`n" -Replace '%0D', "`r"
+        $ReleaseName = "${{ inputs.application }}-${{ steps.create-git-tag.outputs.version }}"
+        gh release create $ReleaseName --latest --title "${{ inputs.application }} v${{ steps.create-git-tag.outputs.version }}" --notes "$($ReleaseNotes)"

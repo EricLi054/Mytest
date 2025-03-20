@@ -1,0 +1,21 @@
+insurance-subgraph:
+  properties:
+    template:
+      containers:
+        - image: racwa.azurecr.io/rac-digital/insurance-subgraph
+          name: insurance-subgraph
+          resources:
+            cpu: 0.25
+            memory: 0.5Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          env:
+            - name: AzureMonitor__ConnectionString
+              secretRef: app-insights-connection-string
+            - name: ASPNETCORE_ENVIRONMENT
+              value: sit
+            - name: AppConfig__Endpoint
+              value: 'https://next-rac-appconfig-sit.azconfig.io/'
+      scale:
+        minReplicas: 2
+        maxReplicas: 2

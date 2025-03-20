@@ -1,0 +1,48 @@
+supergraph-gateway:
+  properties:
+    configuration:
+      ingress:
+        customDomains:
+          - name: supergraph-gateway-sit.ractest.com.au
+            certificateBindingType: SniEnabled
+            certificateName: ractest-wildcard-2024
+      registries:
+        - server: racwa.azurecr.io
+          username: ''
+          passwordSecretRef: ''
+          identity: /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe
+    template:
+      containers:
+        - image: racwa.azurecr.io/rac-digital/supergraph-gateway
+          name: supergraph-gateway
+          resources:
+            cpu: 0.25
+            memory: 0.5Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          env:
+            - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+              secretRef: app-insights-connection-string
+            - name: SUPERGRAPH_ENCRYPTION_KEY
+              secretRef: supergraph-encryption-key
+            - name: AZURE_AD_B2C_JWKS_URL
+              value: https://login-sit.ractest.com.au/racwab2csit.onmicrosoft.com/b2c_1a_signuporsignin/discovery/v2.0/keys
+            - name: AZURE_AD_JWKS_URL
+              value: https://login.microsoftonline.com/6f0e7657-1985-4cc9-9a41-d6ebe342d2e4/discovery/v2.0/keys
+            - name: CONTAINER_APP_ENV
+              value: sit
+            - name: ENABLE_SUPERGRAPH_DEBUG_LOGGING
+              value: false
+            - name: AZURE_CLIENT_ID
+              value: 'b2c852e4-d6b6-442c-921d-3917c36dd86b'
+              # https://github.com/Azure/azure-cli/issues/22677
+            - name: APPSETTING_WEBSITE_SITE_NAME
+              value: 'az_cli_workaround_for_python'
+      scale:
+        minReplicas: 2
+        maxReplicas: 2
+
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+      - /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe

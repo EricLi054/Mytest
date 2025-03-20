@@ -1,0 +1,49 @@
+supergraph-gateway:
+  properties:
+    workloadProfileName: Profile01
+    configuration:
+      ingress:
+        customDomains:
+          - name: supergraph-gateway.rac.com.au
+            certificateBindingType: SniEnabled
+            certificateName: rac-wildcard-2024
+      registries:
+        - server: racwa.azurecr.io
+          username: ''
+          passwordSecretRef: ''
+          identity: /subscriptions/bc8c0622-7aa0-4a8b-8e07-9222ea6b0f02/resourceGroups/rg-next-rac-com-au-prd/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-prd
+    template:
+      containers:
+        - image: racwa.azurecr.io/rac-digital/supergraph-gateway
+          name: supergraph-gateway
+          resources:
+            cpu: 1
+            memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          env:
+            - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+              secretRef: app-insights-connection-string
+            - name: SUPERGRAPH_ENCRYPTION_KEY
+              secretRef: supergraph-encryption-key
+            - name: AZURE_AD_B2C_JWKS_URL
+              value: https://login.rac.com.au/racwab2c.onmicrosoft.com/b2c_1a_signuporsignin/discovery/v2.0/keys
+            - name: AZURE_AD_JWKS_URL
+              value: https://login.microsoftonline.com/6f0e7657-1985-4cc9-9a41-d6ebe342d2e4/discovery/v2.0/keys
+            - name: CONTAINER_APP_ENV
+              value: prd
+            - name: ENABLE_SUPERGRAPH_DEBUG_LOGGING
+              value: false
+            - name: AZURE_CLIENT_ID
+              value: '257bd1b7-95bc-4eb1-979e-9cd25675fc95'
+              # https://github.com/Azure/azure-cli/issues/22677
+            - name: APPSETTING_WEBSITE_SITE_NAME
+              value: 'az_cli_workaround_for_python'
+      scale:
+        minReplicas: 2
+        maxReplicas: 2
+
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+      - /subscriptions/bc8c0622-7aa0-4a8b-8e07-9222ea6b0f02/resourceGroups/rg-next-rac-com-au-prd/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-prd

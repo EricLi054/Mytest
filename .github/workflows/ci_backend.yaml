@@ -1,0 +1,602 @@
+name: '🛠️ Backend: Gateway & SubGraphs (Development)'
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/ci_backend.yaml'
+      - 'infrastructure/modules/container-app/**'
+      - 'backend/subgraphs/**'
+      - 'backend/gateway/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  detect_changed_projects:
+    name: Detect Changed Projects
+    runs-on: ubuntu-latest
+    outputs:
+      changed_project_folders: ${{ steps.detect_changed_projects.outputs.changed_project_folders }}
+      has_type_changes: ${{ steps.check_types_changes.outputs.has_type_changes }}
+      has_gateway_changes: ${{ steps.check_types_changes.outputs.has_gateway_changes }}
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🦺 Setup .NET ${{ env.DOTNET_VERSION }} Environment
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/subgraphs/**/packages.lock.json
+          source-url: https://pkgs.dev.azure.com/racwa/_packaging/RACI_Integration_Feed/nuget/v3/index.json
+
+      - name: 🍻 Install Dependencies
+        shell: bash
+        run: |
+          dotnet restore --locked-mode
+        working-directory: backend/subgraphs
+
+      - name: 🚧 Detect Changed Projects
+        id: detect_changed_projects
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/main HEAD -- ./backend/subgraphs | grep -v '\.Tests/' || true)
+
+          echo "Changed files: $CHANGED_FILES"
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changed files detected."
+            echo "changed_project_folders=[]" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          PROJECT_FOLDERS=$(echo "$CHANGED_FILES" | grep -E "^backend/subgraphs/[^/]+/" | cut -d'/' -f1,2,3 | sort -u)
+
+          if echo "$CHANGED_FILES" | grep -q "^backend/subgraphs/Shared/"; then
+            echo "Detected changes in backend/subgraphs/Shared. Including all projects except tests."
+
+            PROJECT_FOLDERS=$(find backend/subgraphs -maxdepth 1 -mindepth 1 -type d | \
+              grep -vE '\\.Tests$|backend/subgraphs/tests' | \
+              grep -v "backend/subgraphs/Shared" | while read folder; do
+                if find "$folder" -name "*.csproj" -print -quit | grep -q "."; then
+                  echo "$folder"
+                fi
+              done | sort)
+          fi
+
+          echo "Unique project folders with changed files:"
+          echo "$PROJECT_FOLDERS"
+
+          CHANGED_PROJECTS=()
+
+          for folder in $PROJECT_FOLDERS; do
+            echo "Looking for .csproj in $folder..."
+            if [ -d "$folder" ]; then
+              CSProjFile=$(find "$folder" -name "*.csproj" -print -quit)
+              if [ -n "$CSProjFile" ]; then
+                echo "Found .csproj file: $CSProjFile"
+                ProjectFolder=$(dirname "$CSProjFile")
+                CHANGED_PROJECTS+=("$ProjectFolder")
+              else
+                echo "No .csproj file found in $folder"
+              fi
+            else
+              echo "Directory $folder does not exist."
+            fi
+          done
+
+          echo "Changed projects: ${CHANGED_PROJECTS[@]}"
+
+          if [ ${#CHANGED_PROJECTS[@]} -eq 0 ]; then
+            CHANGED_PROJECTS="[]"
+          else
+            CHANGED_PROJECTS=$(printf '%s\n' "${CHANGED_PROJECTS[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          fi
+
+          echo "changed_project_folders=${CHANGED_PROJECTS}" >> $GITHUB_OUTPUT
+
+      - name: ⁉ Check for changes in /Types
+        id: check_types_changes
+        run: |
+          CHANGES_IN_TYPES=false
+          echo "Checking for changes in /Types folders of the following projects: ${{ steps.detect_changed_projects.outputs.changed_project_folders }}"
+
+          # Loop through each project in the array
+          for project in ${{ steps.detect_changed_projects.outputs.changed_project_folders }}; do
+            # Check if any file changed in the /Types directory for the current project
+            if git diff --name-only origin/main HEAD -- "$project/Types"; then
+              CHANGES_IN_TYPES=true
+              echo "Changes detected in $project/Types"
+              break # Exit the loop if any change is found
+            else
+              echo "No changes in $project/Types"
+            fi
+          done
+
+          # Output the result to the GITHUB_ENV
+          if [ "$CHANGES_IN_TYPES" = true ]; then
+            echo "CHANGES_IN_TYPES=true" >> $GITHUB_ENV
+          else
+            echo "CHANGES_IN_TYPES=false" >> $GITHUB_ENV
+          fi
+
+          # Output whether there's a type change
+          echo "has_type_changes=$CHANGES_IN_TYPES" >> $GITHUB_OUTPUT
+
+      - name: 🔍 Check for changes in Gateway
+        id: check_gateway_changes
+        run: |
+          # Fetch the latest changes from the remote 'main' branch
+          git fetch origin main
+
+          # Compare the current working directory with the 'main' branch for the ./backend/gateway directory
+          CHANGES=$(git diff --name-only origin/main -- ./backend/gateway)
+
+          # Check if there are any changes
+          if [ -z "$CHANGES" ]; then
+            echo "No changes detected in ./backend/gateway."
+            echo "has_gateway_changes=false" >> $GITHUB_ENV
+          else
+            echo "Changes detected in ./backend/gateway:"
+            echo "$CHANGES"
+            echo "has_gateway_changes=true" >> $GITHUB_ENV
+          fi
+
+  build_and_test:
+    name: Build and Test
+    needs: detect_changed_projects
+    if: ${{ needs.detect_changed_projects.outputs.changed_project_folders != '[]' }}
+    runs-on: ubuntu-latest
+    outputs:
+      subgraph_version: ${{ steps.subgraph_version.outputs.subgraph_version }}
+      filtered_project_folders: ${{ steps.updated_projects.outputs.filtered_project_folders }}
+
+    strategy:
+      matrix:
+        project_folder: ${{ fromJson(needs.detect_changed_projects.outputs.changed_project_folders) }}
+      fail-fast: false
+      max-parallel: 4
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🦺 Setup .NET ${{ env.DOTNET_VERSION }} Environment
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/subgraphs/**/packages.lock.json
+          source-url: https://pkgs.dev.azure.com/racwa/_packaging/RACI_Integration_Feed/nuget/v3/index.json
+
+      - name: 🍻 Install Dependencies
+        shell: bash
+        run: dotnet restore --locked-mode
+        working-directory: backend/subgraphs
+
+      - name: 🏗️ Build project
+        run: dotnet build ${{ matrix.project_folder }}/*.csproj --configuration Release --no-restore
+
+      - name: 🔍 Find testing project
+        id: testing_project
+        run: |
+          BASENAME=$(basename ${{ matrix.project_folder }})
+          TEST_PROJECT_PATH=$(echo ${{ matrix.project_folder }} | sed "s|/$BASENAME|/tests/$BASENAME.Tests|")
+          echo "Raw TEST_PROJECT_PATH=$TEST_PROJECT_PATH"
+
+          if ls "$TEST_PROJECT_PATH"/*.csproj 1> /dev/null 2>&1; then
+            echo "csproj_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "csproj_found=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "TEST_PROJECT_PATH=$TEST_PROJECT_PATH" >> $GITHUB_ENV
+
+      - name: 🧪 Test
+        if: ${{ steps.testing_project.outputs.csproj_found == 'true' }}
+        run: dotnet test ./$TEST_PROJECT_PATH/*.csproj --no-restore
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ matrix.project_folder }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 📦 Upload artifact
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        with:
+          name: build-${{ env.PROJECT_NAME }}
+          path: ${{ matrix.project_folder }}/bin/Release/net8.0
+        env:
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🍑 Determine Subgraph Version
+        if: ${{ matrix.project_folder != 'backend/subgraphs/Shared' }}
+        id: subgraph_version
+        shell: pwsh
+        run: |
+          git fetch --tags
+          $existingTags = @(git tag -l "${{ matrix.project_folder }}.Subgraph*" | Where-Object { $_ -notmatch "-Next" })
+          $newVersion = "$($existingTags.Count +1).$(${{ github.run_number }})"
+          $newVersionLabel = "$($newVersion)-Preview"
+          echo "subgraph_version=$($newVersionLabel)" >> $env:GITHUB_OUTPUT
+
+      - name: 🔄 Update project folders
+        id: updated_projects
+        run: |
+          original_folders='${{ needs.detect_changed_projects.outputs.changed_project_folders }}'
+          filtered_folders=$(echo "$original_folders" | jq -c 'map(select(. != "backend/subgraphs/Shared"))')
+          echo "filtered_project_folders=${filtered_folders}" >> $GITHUB_OUTPUT
+
+      - name: 📝 Log Changed Projects
+        run: |
+          echo "Filtered Changed Project Folders: ${{ steps.updated_projects.outputs.filtered_project_folders }}"
+
+  integration_test:
+    name: Integration Tests
+    needs: detect_changed_projects
+    if: ${{ needs.detect_changed_projects.outputs.changed_project_folders != '[]' }}
+    runs-on: digital-npe-ubuntu-latest
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    strategy:
+      matrix:
+        project_folder: ${{ fromJson(needs.detect_changed_projects.outputs.changed_project_folders) }}
+      fail-fast: false
+      max-parallel: 4
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🦺 Setup .NET ${{ env.DOTNET_VERSION }} Environment
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/subgraphs/tests/**/packages.lock.json
+          source-url: https://pkgs.dev.azure.com/racwa/_packaging/RACI_Integration_Feed/nuget/v3/index.json
+
+      - name: 🍻 Install Dependencies
+        shell: bash
+        run: |
+          dotnet restore backend/subgraphs/tests/Motoring.Integration.Tests --locked-mode
+          dotnet restore backend/subgraphs/tests/Membership.Integration.Tests --locked-mode
+          dotnet restore backend/subgraphs/tests/Person.Integration.Tests --locked-mode
+          dotnet restore backend/subgraphs/tests/Shared.Integration.Tests --locked-mode
+
+      - name: 🔍 Find testing project
+        id: testing_project
+        run: |
+          BASENAME=$(basename ${{ matrix.project_folder }})
+          TEST_PROJECT_PATH=$(echo ${{ matrix.project_folder }} | sed "s|/$BASENAME|/tests/$BASENAME.Integration.Tests|")
+          echo "Raw TEST_PROJECT_PATH=$TEST_PROJECT_PATH"
+
+          if ls "$TEST_PROJECT_PATH"/*.csproj 1> /dev/null 2>&1; then
+            echo "csproj_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "csproj_found=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "TEST_PROJECT_PATH=$TEST_PROJECT_PATH" >> $GITHUB_ENV
+
+      - name: 🧪 Integration Test
+        if: ${{ steps.testing_project.outputs.csproj_found == 'true' }}
+        run: dotnet test ./$TEST_PROJECT_PATH/*.csproj --no-restore
+        env:
+          ASPNETCORE_ENVIRONMENT: local
+          CI: '' #force appsettings to auto populate with kv values
+
+  build_subgraph_container:
+    name: 🏗️ Build Container Image
+    runs-on: ubuntu-latest
+    needs: [build_and_test, detect_changed_projects]
+    environment: npe
+
+    strategy:
+      matrix:
+        project_folder: ${{ fromJson(needs.build_and_test.outputs.filtered_project_folders) }}
+      fail-fast: false
+      max-parallel: 4
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📝 Set project variable
+        run: echo "SUBGRAPH_IMAGE_NAME=$(basename ${{ matrix.project_folder }} | tr '[:upper:]' '[:lower:]')-subgraph" >> $GITHUB_ENV
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ matrix.project_folder }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 🔽 Download artifact
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4
+        with:
+          name: build-${{ env.PROJECT_NAME }}
+          path: ./${{ matrix.project_folder }}-output
+        env:
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🎪 Build and Push Container Image
+        uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.CONTAINER_REGISTRY_LOGIN_SERVER }}
+          acr_keyvault_name: ${{ env.ACR_KEYVAULT_NAME }}
+          acr_token_secret_name: ${{ env.ACR_TOKEN_SECRET_NAME }}
+          image_name: ${{ env.CONTAINER_REGISTRY_PATH }}/${{ env.SUBGRAPH_IMAGE_NAME }}
+          image_tag: 'preview'
+          version_tag: ${{ needs.build_and_test.outputs.subgraph_version }}
+          docker_context: ./${{ matrix.project_folder }}-output
+          dockerfile_path: ./${{ matrix.project_folder }}/Dockerfile
+          azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+        env:
+          CONTAINER_REGISTRY_LOGIN_SERVER: racwa.azurecr.io
+          CONTAINER_REGISTRY_PATH: rac-digital
+          SUBGRAPH_IMAGE_NAME: ${{ env.SUBGRAPH_IMAGE_NAME }}
+          ACR_KEYVAULT_NAME: acr-racwa
+          ACR_TOKEN_SECRET_NAME: rac-digital-write-access
+
+  dev_deploy_subgraph:
+    name: Deploy to DEV
+    runs-on: digital-npe-ubuntu-latest
+    needs: [build_and_test, build_subgraph_container]
+    environment: npe
+
+    strategy:
+      matrix:
+        project_folder: ${{ fromJson(needs.build_and_test.outputs.filtered_project_folders) }}
+      fail-fast: false
+      max-parallel: 4
+
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      actions: read
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🔧 Set subgraph project variable
+        run: echo "SUBGRAPH_NAME=$(basename ${{ matrix.project_folder }} | tr '[:upper:]' '[:lower:]')-subgraph" >> $GITHUB_ENV
+
+      - name: 📝 Set project variable
+        run: echo "PROJECT_NAME=$(basename ${{ matrix.project_folder }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -refresh=false
+            -var="image_version=${{ needs.build_and_test.outputs.subgraph_version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../${{ matrix.project_folder }}/infra/templates/resources/container-app/${{ env.SUBGRAPH_NAME }}-template.yaml"
+            -var="container_apps_folder=../../../${{ matrix.project_folder }}/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_${{ env.PROJECT_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: ${{ github.event_name != 'workflow_dispatch' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: dev
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          SUBGRAPH_NAME: ${{ env.SUBGRAPH_NAME }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🐙 Terraform Apply
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tf.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve -refresh=false
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tf.plan'
+
+  build_supergraph_container:
+    name: Build Gateway Container Image
+    if: ${{ needs.detect_changed_projects.outputs.has_type_changes == 'true' || needs.detect_changed_projects.outputs.has_gateway_changes == 'true' }}
+    needs: detect_changed_projects
+    runs-on: ubuntu-latest
+    environment: npe
+    outputs:
+      supergraph_gateway_version: ${{ steps.supergraph_gateway_version.outputs.supergraph_gateway_version }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🍑 Determine Supergraph Gateway Version
+        id: supergraph_gateway_version
+        shell: pwsh
+        run: |
+          git fetch --tags
+          $existingTags = @(git tag -l "Supergraph.Gateway*" | Where-Object { $_ -notmatch "-Next" })
+          $newVersion = "$($existingTags.Count +1).$(${{ github.run_number }})"
+          $newVersionLabel = "$($newVersion)-Preview"
+          echo "supergraph_gateway_version=$($newVersionLabel)" >> $env:GITHUB_OUTPUT
+
+      - name: 🎪 Build and Push Container Image
+        uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.CONTAINER_REGISTRY_LOGIN_SERVER }}
+          acr_keyvault_name: ${{ env.ACR_KEYVAULT_NAME }}
+          acr_token_secret_name: ${{ env.ACR_TOKEN_SECRET_NAME }}
+          image_name: ${{ env.CONTAINER_REGISTRY_PATH }}/${{ env.SUPERGRAPH_IMAGE_NAME }}
+          image_tag: 'preview'
+          version_tag: ${{ steps.supergraph_gateway_version.outputs.supergraph_gateway_version }}
+          docker_context: .
+          dockerfile_path: ./backend/gateway/Dockerfile
+          azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+        env:
+          CONTAINER_REGISTRY_LOGIN_SERVER: racwa.azurecr.io
+          CONTAINER_REGISTRY_PATH: rac-digital
+          SUPERGRAPH_IMAGE_NAME: supergraph-gateway
+          ACR_KEYVAULT_NAME: acr-racwa
+          ACR_TOKEN_SECRET_NAME: rac-digital-write-access
+
+  dev_deploy_gateway:
+    name: Deploy Gateway to DEV
+    needs: [build_supergraph_container]
+    runs-on: digital-npe-ubuntu-latest
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🚀 Build & Upload Supergraph
+        uses: ./.github/actions/build-supergraph
+        with:
+          environment: 'dev'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+          container-app-name: 'supergraph-gateway'
+          should-restart-container: false
+        env:
+          CONTAINER_APP_ENV: 'dev'
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -refresh=false
+            -var="image_version=${{ needs.build_supergraph_container.outputs.supergraph_gateway_version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../backend/gateway/infra/templates/resources/container-app/supergraph-gateway-template.yaml"
+            -var="container_apps_folder=../../../backend/gateway/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_supergraph_gateway_${{ env.ENV }}.tfstate'
+          is_pull_request: ${{ github.event_name != 'workflow_dispatch' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: dev
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: 🐙 Terraform Apply
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tf.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve -refresh=false
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tf.plan'

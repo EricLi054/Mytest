@@ -1,3 +1,34 @@
-#  - (Group IT Digital SME)
-*	@racwa/group-it-digital-sme
-CODEOWNERS	@racwa/maintainers
+# Default to Digital Platform Team - (Digital Platform Team)
+* @racwa/digital-platform-team
+
+# Default to the 'Digital Usage and Maintenance Team' for the 'Motoring' application
+/frontend/apps/motoring @racwa/digital-usage-and-maintenance-team @racwa/digital-platform-team
+
+# Default to the 'Digital Identity Team' for the 'Identity' application
+/frontend/apps/identity @racwa/digital-identity-team @racwa/digital-platform-team
+/frontend/static-content/identity/ @racwa/digital-identity-team @racwa/digital-platform-team
+
+# Default to the 'Group IT Digital SME' for the 'Common' application
+/frontend/apps/common @racwa/group-it-digital-sme @racwa/digital-platform-team
+
+# Default to the 'Group IT Digital SME' for the 'myRAC' application
+/frontend/apps/myrac @racwa/group-it-digital-sme @racwa/digital-platform-team
+
+# Default 'Shared' items to all teams
+pnpm-lock.yaml @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+pnpm-workspace.yaml @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+package.json @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+/backend @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+/frontend/packages @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+/frontend/apps/storybook @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+/infrastructure @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+/tooling @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+/turbo @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+/.vscode @racwa/digital-platform-team @racwa/digital-usage-and-maintenance-team @racwa/digital-identity-team @racwa/group-it-digital-sme
+
+# Default 'Important' items to be reviewed by the `Platform Team`
+/backend/gateway/mesh.config.ts @racwa/digital-platform-team
+/backend/gateway/gateway.config.ts @racwa/digital-platform-team
+
+
+CODEOWNERS @racwa/maintainers

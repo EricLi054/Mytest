@@ -1,0 +1,11 @@
+{
+  "extends": "@racwa/tsconfig/internal-package.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "ES2022"],
+    "jsx": "react-jsx",
+    "types": ["@testing-library/jest-dom"],
+    "rootDir": "./"
+  },
+  "include": ["*.ts", "src"],
+  "exclude": ["node_modules", "coverage"]
+}

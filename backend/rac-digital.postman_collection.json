@@ -1,0 +1,1141 @@
+{
+	"info": {
+		"_postman_id": "e668c1b1-0208-4774-b9c8-f96f04192e3a",
+		"name": "rac-digital",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Motoring",
+			"item": [
+				{
+					"name": "Change My Vehicle",
+					"item": [
+						{
+							"name": "GetRoadsideProductData",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "  query GetRoadsideProductData($productId: String!, $lineId: String!) {\r\n    me {\r\n      firstName\r\n      roadsideProduct(id: $productId) {\r\n        isActive\r\n        line(id: $lineId) {\r\n          vehicleDetail {\r\n            year\r\n            make\r\n            model\r\n            variant\r\n            series\r\n            body\r\n            height\r\n            length\r\n            width\r\n            kerbWeight\r\n            transmission\r\n            fuel\r\n            cylinder\r\n            cc\r\n            co2Emission\r\n            registrationNumber\r\n            vin\r\n            nvic\r\n            color\r\n          }\r\n        }\r\n      }\r\n    }\r\n  }",
+										"variables": "{\r\n    \"productId\": \"PHH200638385\",\r\n    \"lineId\": \"RSA010076050-1\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "GetVehicleByRego",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "  query GetVehicleByRego($vehicleType: VehicleType!, $rego: String!, $state: State!) {\r\n    vehicleByRego(vehicleType: $vehicleType, rego: $rego, state: $state) {\r\n      year\r\n      make\r\n      model\r\n      variant\r\n      series\r\n      body\r\n      height\r\n      length\r\n      width\r\n      kerbWeight\r\n      transmission\r\n      fuel\r\n      cylinder\r\n      cc\r\n      co2Emission\r\n      registrationNumber\r\n      vin\r\n      nvic\r\n      color\r\n    }\r\n  }",
+										"variables": "{\r\n    \"vehicleType\": \"CAR\",\r\n    \"rego\": \"MOCK101\",\r\n    \"state\": \"WA\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "UpdateRoadsideVehicle",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "  mutation UpdateRoadsideVehicle($productId: String!, $lineId: String!, $newVehicleDetail: VehicleDetailInput!) {\r\n    updateRoadsideVehicle(productId: $productId, lineId: $lineId, newVehicleDetail: $newVehicleDetail) {\r\n        id\r\n    }\r\n  }",
+										"variables": "{\r\n    \"productId\": \"\",\r\n    \"lineId\": \"\",\r\n    \"newVehicleDetails\": {}\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Person",
+			"item": [
+				{
+					"name": "MFA",
+					"item": [
+						{
+							"name": "OtpVerificationDetails",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation OtpVerificationDetails($sessionKey: String!) {\r\n  otpVerificationDetails(key: $sessionKey) {\r\n    isAuthenticated\r\n    isMobile\r\n    phoneNumberSuffix\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Contact-Update-123\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "RegistrationOtpVerificationDetails",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{my-rac-registration-bearer-token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation RegistrationOtpVerificationDetails($sessionKey: String!, $crmId: String!) {\r\n  registrationOtpVerificationDetails(crmId: $crmId, key: $sessionKey) {\r\n    isAuthenticated\r\n    isMobile\r\n    phoneNumberSuffix\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Registration-123\",\r\n  \"crmId\": \"ffffffff-ffff-ffff-ffff-ffffffffffff\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "CheckOtp",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation CheckOtp($sessionKey: String!) {\r\n  checkOtp(key: $sessionKey) {\r\n    isAuthenticated\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Contact-Update-123\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "CheckRegistrationOtp",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{my-rac-registration-bearer-token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation CheckRegistrationOtp($sessionKey: String!, $crmId: String!) {\r\n  checkRegistrationOtp(key: $sessionKey, crmId: $crmId) {\r\n    isAuthenticated\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Registration-123\",\r\n  \"crmId\": \"ffffffff-ffff-ffff-ffff-ffffffffffff\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "CheckAndSendOtp",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation CheckAndSendOtp($sessionKey: String!, $channel: OtpChannel!) {\r\n  checkAndSendOtp(input: {key: $sessionKey, channel: $channel}) {\r\n    sendOtpResponse {\r\n      hasSendAttemptsRemaining\r\n    }\r\n    errors {\r\n      ... on Error {\r\n        __typename\r\n        message\r\n      }\r\n    }\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Contact-Update-123\",\r\n  \"channel\": \"SMS\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "CheckAndSendRegistrationOtp",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{my-rac-registration-bearer-token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation CheckAndSendRegistrationOtp($sessionKey: String!, $crmId: String!, $channel: OtpChannel!) {\r\n  checkAndSendRegistrationOtp(\r\n    input: {crmId: $crmId, key: $sessionKey, channel: $channel}\r\n  ) {\r\n    sendOtpResponse {\r\n      hasSendAttemptsRemaining\r\n    }\r\n    errors {\r\n      ... on Error {\r\n        __typename\r\n        message\r\n      }\r\n    }\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Registration-123\",\r\n  \"crmId\": \"ffffffff-ffff-ffff-ffff-ffffffffffff\",\r\n  \"channel\": \"SMS\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "CheckAndVerifyOtp",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation CheckAndVerifyOtp($sessionKey: String!, $code: String!) {\r\n  checkAndVerifyOtp(input: { key: $sessionKey, code: $code }) {\r\n    errors {\r\n      ... on Error {\r\n        __typename\r\n        message\r\n      }\r\n    }\r\n    verifyOtpResponse {\r\n      isVerified\r\n    }\r\n  }\r\n}\r\n",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Contact-Update-123\",\r\n  \"code\": \"000000\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "CheckAndVerifyRegistrationOtp",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{my-rac-registration-bearer-token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation CheckAndVerifyRegistrationOtp($sessionKey: String!, $crmId: String!, $code: String!) {\r\n  checkAndVerifyRegistrationOtp(\r\n    input: {crmId: $crmId, key: $sessionKey, code: $code}\r\n  ) {\r\n    verifyOtpResponse {\r\n      isVerified\r\n    }\r\n    errors {\r\n      ... on Error {\r\n        __typename\r\n        message\r\n      }\r\n    }\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Registration-123\",\r\n  \"crmId\": \"ffffffff-ffff-ffff-ffff-ffffffffffff\",\r\n  \"code\": \"000000\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "SendOtp",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation SendOtp($sessionKey: String!, $channel: OtpChannel!) {\r\n  sendOtp(input: {key: $sessionKey, channel: $channel}) {\r\n    hasSendAttemptsRemaining\r\n    errors {\r\n      ... on Error {\r\n        __typename\r\n        message\r\n      }\r\n    }\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Contact-Update-123\",\r\n  \"channel\": \"SMS\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "SendRegistrationOtp",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{my-rac-registration-bearer-token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation SendRegistrationOtp($sessionKey: String!, $crmId: String!, $channel: OtpChannel!) {\r\n  sendRegistrationOtp(input: {crmId: $crmId, key: $sessionKey, channel: $channel}) {\r\n    sendOtpResponse {\r\n      hasSendAttemptsRemaining\r\n    }\r\n    errors {\r\n      ... on Error {\r\n        __typename\r\n        message\r\n      }\r\n    }\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Registration-123\",\r\n  \"crmId\": \"ffffffff-ffff-ffff-ffff-ffffffffffff\",\r\n  \"channel\": \"SMS\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "VerifyOtp",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation VerifyOtp($sessionKey: String!, $verificationCode: String!) {\r\n  verifyOtp(input: { key: $sessionKey, code: $verificationCode }) {\r\n    isVerified\r\n    errors {\r\n      ... on Error {\r\n        __typename\r\n        message\r\n      }\r\n    }\r\n  }\r\n}\r\n",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Contact-Update-123\",\r\n  \"verificationCode\": \"000000\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "VerifyRegistrationOtp",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{my-rac-registration-bearer-token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "SourceSystem",
+										"value": "local",
+										"type": "text"
+									},
+									{
+										"key": "Feature_BypassOtp",
+										"value": "false",
+										"type": "default"
+									},
+									{
+										"key": "Feature_OverrideToNumber",
+										"value": "",
+										"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+										"type": "default",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "graphql",
+									"graphql": {
+										"query": "mutation VerifyRegistrationOtp($sessionKey: String!, $crmId: String!, $verificationCode: String!) {\r\n  verifyRegistrationOtp(\r\n    input: {crmId: $crmId, key: $sessionKey, code: $verificationCode}\r\n  ) {\r\n    verifyOtpResponse {\r\n      isVerified\r\n    }\r\n    errors {\r\n      ... on Error {\r\n        __typename\r\n        message\r\n      }\r\n    }\r\n  }\r\n}",
+										"variables": "{\r\n  \"sessionKey\": \"myRAC-Registration-123\",\r\n  \"crmId\": \"ffffffff-ffff-ffff-ffff-ffffffffffff\",\r\n  \"verificationCode\": \"000000\"\r\n}"
+									}
+								},
+								"url": {
+									"raw": "{{gql-gateway-url-local}}",
+									"host": [
+										"{{gql-gateway-url-local}}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Me",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "SourceSystem",
+								"value": "local",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "graphql",
+							"graphql": {
+								"query": "query Me { \r\n  me {\r\n    personId,\r\n    racId,\r\n    firstName,\r\n  }\r\n}",
+								"variables": ""
+							}
+						},
+						"url": {
+							"raw": "{{gql-gateway-url-local}}",
+							"host": [
+								"{{gql-gateway-url-local}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "MeWithOtpVerificationDetails",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "SourceSystem",
+								"value": "local",
+								"type": "text"
+							},
+							{
+								"key": "Feature_BypassOtp",
+								"value": "false",
+								"type": "default"
+							},
+							{
+								"key": "Feature_OverrideToNumber",
+								"value": "",
+								"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+								"type": "default",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "graphql",
+							"graphql": {
+								"query": "query MeWithOtpVerificationDetails($sessionKey: String!) {\r\n  me {\r\n    personId\r\n    racId\r\n    firstName\r\n    otpVerificationDetails(sessionKey: $sessionKey) {\r\n      sessionKey\r\n      isAuthenticated\r\n      isMobile\r\n      phoneNumberSuffix\r\n    }\r\n  }\r\n}",
+								"variables": "{\r\n  \"sessionKey\": \"myRAC-Contact-Update-123\"\r\n}"
+							}
+						},
+						"url": {
+							"raw": "{{gql-gateway-url-local}}",
+							"host": [
+								"{{gql-gateway-url-local}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Match",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{my-rac-registration-bearer-token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "SourceSystem",
+								"value": "local",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "graphql",
+							"graphql": {
+								"query": "mutation Match($matchRequest: MatchInput!) {\r\n  match(input: $matchRequest) {\r\n    matchedPerson {\r\n      personId\r\n      racId\r\n      firstName\r\n      mobilePhone\r\n      membershipType\r\n    }\r\n    errors {\r\n      type: __typename\r\n    }\r\n  }\r\n}",
+								"variables": "{\r\n  \"matchRequest\": {\r\n    \"request\": {\r\n    \"firstName\": \"John\",\r\n    \"surname\": \"Wick\",\r\n    \"dateOfBirth\": \"1980-01-10\",\r\n    \"mobilePhone\": \"0489556456\",\r\n    \"racId\": \"\",\r\n    \"productNumber\": \"\"\r\n  \t}\r\n  }\r\n}"
+							}
+						},
+						"url": {
+							"raw": "{{gql-gateway-url-local}}",
+							"host": [
+								"{{gql-gateway-url-local}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "MatchWithOtpVerificationDetails",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{my-rac-registration-bearer-token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "SourceSystem",
+								"value": "local",
+								"type": "text"
+							},
+							{
+								"key": "Feature_BypassOtp",
+								"value": "false",
+								"type": "default"
+							},
+							{
+								"key": "Feature_OverrideToNumber",
+								"value": "",
+								"description": "DON'T USE REAL MEMBER PHONE NUMBERS AS WILL ACTUALLY SEND IN NPE",
+								"type": "default",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "graphql",
+							"graphql": {
+								"query": "mutation MatchWithOtpVerificationDetails($matchRequest: MatchInput!, $sessionKey: String!) {\r\n  match(input: $matchRequest) {\r\n    matchedPerson {\r\n      personId\r\n      racId\r\n      firstName\r\n      mobilePhone\r\n      membershipType\r\n      otpVerificationDetails(sessionKey: $sessionKey) {\r\n        sessionKey\r\n        isAuthenticated\r\n        isMobile\r\n        phoneNumberSuffix\r\n      }\r\n    }\r\n    errors {\r\n      ... on Error {\r\n        __typename\r\n        message\r\n      }\r\n    }\r\n  }\r\n}",
+								"variables": "{\r\n  \"matchRequest\": {\r\n    \"request\": {\r\n      \"firstName\": \"John\",\r\n      \"surname\": \"Wick\",\r\n      \"dateOfBirth\": \"1980-01-10\",\r\n      \"mobilePhone\": \"0489556456\",\r\n      \"racId\": \"\",\r\n      \"productNumber\": \"\"\r\n    }\r\n  },\r\n  \"sessionKey\": \"myRAC-Registration-123\"\r\n}"
+							}
+						},
+						"url": {
+							"raw": "{{gql-gateway-url-local}}",
+							"host": [
+								"{{gql-gateway-url-local}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Utilities",
+			"item": [
+				{
+					"name": "Switch Member",
+					"item": [
+						{
+							"name": "SearchMemberByEmail",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {\r",
+											"    const response = pm.response.json()\r",
+											"    const request = JSON.parse(pm.request.body);\r",
+											"    const collectionVariableName = \"utilities-switch-member-objectid\"\r",
+											"\r",
+											"    if (response.length < 1) {\r",
+											"        const result = `No member found with email [${request.email}]`\r",
+											"        pm.collectionVariables.set(collectionVariableName, result);\r",
+											"        return;\r",
+											"    } else if (response.length > 1) {\r",
+											"        const result = `Found ${response.length} members with email [${request.email}]`\r",
+											"        pm.collectionVariables.set(collectionVariableName, result);\r",
+											"        return;\r",
+											"    }\r",
+											"\r",
+											"    const member = response[0];\r",
+											"    console.log(`Found member with ObjectId [${member.id}] and CRM ID [${member.crmId}]`);\r",
+											"\r",
+											"    pm.collectionVariables.set(collectionVariableName, member.id);\r",
+											"\r",
+											"    console.log(pm.request.headers);\r",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Ocp-Apim-Subscription-Key",
+										"value": "{{apim-subscription-key}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"email\": \"fruit-different@u8pbw776.mailosaur.net\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "https://az-api-sit.ractest.com.au/adb2cgraph/v1/user-by-email",
+									"protocol": "https",
+									"host": [
+										"az-api-sit",
+										"ractest",
+										"com",
+										"au"
+									],
+									"path": [
+										"adb2cgraph",
+										"v1",
+										"user-by-email"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "SearchMemberByCrmId",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {\r",
+											"    const response = pm.response.json()\r",
+											"    const request = JSON.parse(pm.request.body);\r",
+											"    const collectionVariableName = \"utilities-switch-member-objectid\"\r",
+											"\r",
+											"    if (response.length < 1) {\r",
+											"        const result = `No member found with CRM ID [${request.crmid}]`\r",
+											"        pm.collectionVariables.set(collectionVariableName, result);\r",
+											"        return;\r",
+											"    } else if (response.length > 1) {\r",
+											"        const result = `Found ${response.length} members with CRM ID [${request.crmid}]`\r",
+											"        pm.collectionVariables.set(collectionVariableName, result);\r",
+											"        return;\r",
+											"    }\r",
+											"\r",
+											"    const member = response[0];\r",
+											"    console.log(`Found member with ObjectId [${member.id}] and CRM ID [${member.crmId}]`);\r",
+											"\r",
+											"    pm.collectionVariables.set(collectionVariableName, member.id);\r",
+											"\r",
+											"    console.log(pm.request.headers);\r",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Ocp-Apim-Subscription-Key",
+										"value": "{{apim-subscription-key}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"crmid\": \"cffe6bdf-dd9c-e559-625c-0b2bf3bcf99d\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "https://az-api-sit.ractest.com.au/adb2cgraph/v1/user-by-crmid",
+									"protocol": "https",
+									"host": [
+										"az-api-sit",
+										"ractest",
+										"com",
+										"au"
+									],
+									"path": [
+										"adb2cgraph",
+										"v1",
+										"user-by-crmid"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "SwitchMember",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Ocp-Apim-Subscription-Key",
+										"value": "{{apim-subscription-key}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"crmid\": \"xxx\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "https://az-api-sit.ractest.com.au/adb2cgraph/v1/users/{{utilities-switch-member-objectid}}",
+									"protocol": "https",
+									"host": [
+										"az-api-sit",
+										"ractest",
+										"com",
+										"au"
+									],
+									"path": [
+										"adb2cgraph",
+										"v1",
+										"users",
+										"{{utilities-switch-member-objectid}}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "oauth2",
+		"oauth2": [
+			{
+				"key": "accessTokenUrl",
+				"value": "{{auth-url}}/token",
+				"type": "string"
+			},
+			{
+				"key": "authUrl",
+				"value": "{{auth-url}}/authorize",
+				"type": "string"
+			},
+			{
+				"key": "scope",
+				"value": "{{auth-client-id}} offline_access openid profile",
+				"type": "string"
+			},
+			{
+				"key": "clientSecret",
+				"value": "{{auth-client-secret}}",
+				"type": "string"
+			},
+			{
+				"key": "clientId",
+				"value": "{{auth-client-id}}",
+				"type": "string"
+			},
+			{
+				"key": "state",
+				"value": "6zmKMDcVOk6oGZKVe/+T+g==",
+				"type": "string"
+			},
+			{
+				"key": "tokenName",
+				"value": "digital adb2c",
+				"type": "string"
+			},
+			{
+				"key": "client_authentication",
+				"value": "body",
+				"type": "string"
+			},
+			{
+				"key": "refreshRequestParams",
+				"value": [],
+				"type": "any"
+			},
+			{
+				"key": "tokenRequestParams",
+				"value": [],
+				"type": "any"
+			},
+			{
+				"key": "authRequestParams",
+				"value": [],
+				"type": "any"
+			},
+			{
+				"key": "challengeAlgorithm",
+				"value": "S256",
+				"type": "string"
+			},
+			{
+				"key": "useBrowser",
+				"value": true,
+				"type": "boolean"
+			},
+			{
+				"key": "grant_type",
+				"value": "authorization_code",
+				"type": "string"
+			},
+			{
+				"key": "addTokenTo",
+				"value": "header",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "auth-client-secret",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "auth-client-id",
+			"value": "5c8adb1c-9901-44be-a152-c02389a93c86",
+			"type": "string"
+		},
+		{
+			"key": "auth-url",
+			"value": "https://login-sit.ractest.com.au/RACWAB2CSIT.onmicrosoft.com/B2C_1A_SignUpOrSignIn/oauth2/v2.0",
+			"type": "string"
+		},
+		{
+			"key": "gql-gateway-url-local",
+			"value": "http://localhost:4000/graphql/",
+			"type": "string"
+		},
+		{
+			"key": "gql-gateway-url-sit",
+			"value": "https://supergraph-gateway-sit.ractest.com.au/graphql",
+			"type": "string"
+		},
+		{
+			"key": "apim-subscription-key",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "utilities-switch-member-objectid",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "my-rac-registration-bearer-token",
+			"value": "",
+			"type": "default"
+		}
+	]
+}

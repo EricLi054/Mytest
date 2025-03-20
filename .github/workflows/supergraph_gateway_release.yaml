@@ -1,0 +1,719 @@
+name: '🛠️ Backend: Supergraph Gateway'
+
+on:
+  workflow_dispatch:
+    inputs:
+      redeploy_infra:
+        description: 'Force a redeploy of infra?'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - 'main'
+    tags-ignore:
+      - '*'
+    paths:
+      - '.github/workflows/supergraph_gateway_release.yaml'
+      - 'backend/subgraphs/**'
+      - '!backend/subgraphs/**/infra'
+      - 'backend/gateway/**'
+      - 'infrastructure/modules/container-app/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GIT_TAG: 'Supergraph.Gateway'
+  DOTNET_VERSION: '8.0.x'
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  check_build:
+    name: Check Build
+    runs-on: ubuntu-latest
+    outputs:
+      hasInfraChanges: ${{ steps.version.outputs.hasInfraChanges }}
+      release-notes: ${{ steps.release-notes.outputs.release-notes }}
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔬 Check for Infra Changes
+        id: version
+        shell: pwsh
+        run: |
+          git fetch --tags
+          $existingTags = @(git tag -l "${{ env.GIT_TAG }}*" | Where-Object { $_ -notmatch "-Next" })
+          $existingTagDates = @{}
+          $lastProductionSha = ""
+                
+          foreach ($tag in $existingTags) {
+              $commitDate = git for-each-ref --sort=-creatordate --format '%(creatordate:iso8601)' refs/tags/$tag
+              $existingTagDates[$tag] = [datetime]$commitDate
+          }
+          if ($existingTagDates.Count -eq 0) {
+              $lastProductionSha = git rev-list --max-parents=0 HEAD
+          } else {
+              $lastProductionTag = $existingTagDates.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 1
+              $lastProductionTagName = $lastProductionTag.Key
+              $lastProductionSha = git rev-list -n 1 $lastProductionTagName
+          }
+          $changedFiles = @(git diff-tree --name-only -r (git rev-list -n 1 "$($lastProductionSha)") "${{ github.sha }}")
+
+          $infraFiles = @("pnpm-lock.yaml","infrastructure/modules/container-app/","backend/gateway/infra/","backend/gateway/Dockerfile","backend/gateway/Dockerfile.ignore","backend/gateway/gateway.config.ts","backend/gateway/package.json","backend/gateway/scripts/entrypoint.sh")
+          $infraFileChanges = (git diff-tree --name-only -r "$($lastProductionSha)" '${{ github.sha }}') | Where-Object {
+              $filePath = $_
+              $infraFiles -contains ($infraFiles | Where-Object { $filePath.StartsWith($_) })
+          }
+
+          $hasInfraChanges = $infraFileChanges.Count -gt 0 -or '${{ inputs.redeploy_infra }}' -eq 'true'
+          Write-Host "This build will $($hasInfraChanges ? '' : 'not ')redeploy infrastructure. File Change Count: $($infraFileChanges.Count)"
+          "hasInfraChanges=$($hasInfraChanges)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+  build_container:
+    name: Build Container Image
+    runs-on: ubuntu-latest
+    if: needs.check_build.outputs.hasInfraChanges == 'true'
+    needs: check_build
+    environment: npe
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🏷️ Git Tag
+        id: git-tag
+        uses: './.github/actions/create-git-tag'
+        with:
+          application: ${{ env.GIT_TAG }}
+          is_production: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🍑 Determine Version
+        id: version
+        shell: pwsh
+        run: |
+          $newVersion = "${{ steps.git-tag.outputs.version }}"
+
+          $isMain = if ($env:GITHUB_REF -eq 'refs/heads/main') { 'true' } else { 'false' }
+          $imageTag = "latest"
+
+          $githubEvent = "${{ github.event_name  }}"
+          if ($githubEvent -eq "pull_request" ) {
+            $branch = "${{ github.head_ref }}"
+            $isMain = $branch -eq "main"
+          } else {
+            $branch = "${{ github.ref }}"
+            $isMain = $branch -eq "refs/heads/main"
+          }
+
+          if ($isMain -eq $False) {
+            $imageTag = "preview"
+            $newVersion = "$($newVersion)-Preview"
+          }
+
+          Write-Host "Is Main: $($isMain)"
+          Write-Host "Image Tag: $($imageTag)"
+          Write-Host "Container Version: $($newVersion)"
+
+          "isMain=$($isMain)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "imageTag=$($imageTag)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "version=$($newVersion)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          # Note: Some bug happening, where it is exiting with code 1
+          exit 0;
+
+      - name: 📝 Create Release Notes
+        id: release-notes
+        uses: './.github/actions/release-notes'
+        with:
+          application_name: 'Supergraph GraphQL Gateway'
+          git_tag_name: ${{ env.GIT_TAG }}
+          application_directory: 'backend/gateway'
+          shared_resources: 'backend/subgraphs,infrastructure/modules/container-app,.github/workflows/supergraph_gateway_release.yaml'
+          version: ${{ steps.version.outputs.version }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🎪 Build and Push Container Image
+        uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.CONTAINER_REGISTRY_LOGIN_SERVER }}
+          acr_keyvault_name: ${{ env.ACR_KEYVAULT_NAME }}
+          acr_token_secret_name: ${{ env.ACR_TOKEN_SECRET_NAME }}
+          image_name: ${{ env.CONTAINER_REGISTRY_PATH }}/${{ env.SUPERGRAPH_IMAGE_NAME }}
+          image_tag: ${{ steps.version.outputs.image_tag }}
+          version_tag: ${{ steps.version.outputs.version }}
+          docker_context: .
+          dockerfile_path: ./backend/gateway/Dockerfile
+          azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+        env:
+          CONTAINER_REGISTRY_LOGIN_SERVER: racwa.azurecr.io
+          CONTAINER_REGISTRY_PATH: rac-digital
+          SUPERGRAPH_IMAGE_NAME: supergraph-gateway
+          ACR_KEYVAULT_NAME: acr-racwa
+          ACR_TOKEN_SECRET_NAME: rac-digital-write-access
+
+  dev_deploy:
+    name: Deploy to DEV
+    runs-on: digital-npe-ubuntu-latest
+    needs: build_container
+    environment: graphql-gateway-dev
+
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🚀 Build & Upload Supergraph
+        uses: ./.github/actions/build-supergraph
+        with:
+          environment: 'dev'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+          container-app-name: 'supergraph-gateway'
+          should-restart-container: false
+        env:
+          CONTAINER_APP_ENV: 'dev'
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -refresh=false
+            -var="image_version=${{ needs.build_container.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../backend/gateway/infra/templates/resources/container-app/supergraph-gateway-template.yaml"
+            -var="container_apps_folder=../../../backend/gateway/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_supergraph_gateway_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: dev
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: 🐙 Terraform Apply
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tf.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve -refresh=false
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tf.plan'
+
+  sit_deploy:
+    name: Deploy to SIT
+    runs-on: digital-npe-ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: build_container
+    environment: graphql-gateway-sit
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🚀 Build & Upload Supergraph
+        uses: ./.github/actions/build-supergraph
+        with:
+          environment: 'sit'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+          container-app-name: 'supergraph-gateway'
+          should-restart-container: false
+        env:
+          CONTAINER_APP_ENV: 'sit'
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -refresh=false
+            -var="image_version=${{ needs.build_container.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../backend/gateway/infra/templates/resources/container-app/supergraph-gateway-template.yaml"
+            -var="container_apps_folder=../../../backend/gateway/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_supergraph_gateway_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: sit
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: 🐙 Terraform Apply
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tf.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve -refresh=false
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tf.plan'
+
+  uat_plan:
+    # We want this check so that the deployment section in the repository shows the most recent deployment, and not 'waiting' for deployment
+    if: github.ref == 'refs/heads/main' && github.run_attempt > 1
+    name: Deploy to UAT - Plan
+    needs: build_container
+    runs-on: digital-npe-ubuntu-latest
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      terraform_plan_filename: ${{ steps.terraform_plan.outputs.terraform_plan_filename }}
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📺 Terraform Plan
+        id: terraform_plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -var="image_version=${{ needs.build_container.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../backend/gateway/infra/templates/resources/container-app/supergraph-gateway-template.yaml"
+            -var="container_apps_folder=../../../backend/gateway/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_supergraph_gateway_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: uat
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+  uat_deploy:
+    name: Deploy to UAT - Apply
+    runs-on: digital-npe-ubuntu-latest
+    needs: uat_plan
+    environment: graphql-gateway-uat
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🚀 Build & Upload Supergraph
+        uses: ./.github/actions/build-supergraph
+        with:
+          environment: 'uat'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+          container-app-name: 'supergraph-gateway'
+          should-restart-container: false
+        env:
+          CONTAINER_APP_ENV: 'uat'
+
+      - name: 🐙 Terraform Apply
+        uses: ./.github/actions/apply-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: '-input=false -auto-approve'
+          terraform_backend_key: 'infrastructure_container_app_backend_supergraph_gateway_${{ env.ENV }}.tfstate'
+          terraform_plan_filename: '${{ needs.uat_plan.outputs.terraform_plan_filename }}'
+        env:
+          ENV: uat
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: '${{ env.TERRAFORM_DIRECTORY }}'
+          terraform_plan_file: '${{ needs.uat_plan.outputs.terraform_plan_filename }}'
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+
+  prd_plan:
+    # We want this check so that the deployment section in the repository shows the most recent deployment, and not 'waiting' for deployment
+    if: github.ref == 'refs/heads/main' && github.run_attempt > 1
+    name: Deploy to PRD - Plan
+    needs: build_container
+    runs-on: ubuntu-latest
+    environment: prd
+
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      terraform_plan_filename: ${{ steps.terraform_plan.outputs.terraform_plan_filename }}
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📺 Terraform Plan
+        id: terraform_plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/prd'
+          terraform_options: >-
+            -input=false
+            -var="image_version=${{ needs.build_container.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../backend/gateway/infra/templates/resources/container-app/supergraph-gateway-template.yaml"
+            -var="container_apps_folder=../../../backend/gateway/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_supergraph_gateway_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: prd
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+  prd_deploy:
+    name: Deploy to PRD - Apply
+    runs-on: ubuntu-latest
+    needs: [check_build, prd_plan]
+    environment: graphql-gateway-prd
+
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🚀 Build & Upload Supergraph
+        uses: ./.github/actions/build-supergraph
+        with:
+          environment: 'prd'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+          container-app-name: 'supergraph-gateway'
+          should-restart-container: false
+        env:
+          CONTAINER_APP_ENV: 'prd'
+
+      - name: 🐙 Terraform Apply
+        uses: ./.github/actions/apply-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/prd'
+          terraform_options: '-input=false -auto-approve'
+          terraform_backend_key: 'infrastructure_container_app_backend_supergraph_gateway_${{ env.ENV }}.tfstate'
+          terraform_plan_filename: '${{ needs.prd_plan.outputs.terraform_plan_filename }}'
+        env:
+          ENV: prd
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: '${{ env.TERRAFORM_DIRECTORY }}'
+          terraform_plan_file: '${{ needs.prd_plan.outputs.terraform_plan_filename }}'
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/prd'
+
+      - name: 🏷️ Git Tag
+        id: git-tag
+        uses: './.github/actions/create-git-tag'
+        if: always()
+        with:
+          application: ${{ env.GIT_TAG }}
+          is_production: true
+          release_notes: ${{ needs.check_build.outputs.release-notes }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dev_update_supergraph_secret:
+    name: Upload Latest DEV Supergraph
+    runs-on: digital-npe-ubuntu-latest
+    if: needs.check_build.outputs.hasInfraChanges == 'false'
+    needs: check_build
+    environment: graphql-gateway-dev
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🚀 Build & Upload Supergraph
+        uses: ./.github/actions/build-supergraph
+        with:
+          environment: 'dev'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+          container-app-name: 'supergraph-gateway'
+        env:
+          CONTAINER_APP_ENV: 'dev'
+
+  sit_update_supergraph_secret:
+    name: Upload Latest SIT Supergraph
+    runs-on: digital-npe-ubuntu-latest
+    if: github.ref == 'refs/heads/main' && needs.check_build.outputs.hasInfraChanges == 'false'
+    needs: check_build
+    environment: graphql-gateway-sit
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🚀 Build & Upload Supergraph
+        uses: ./.github/actions/build-supergraph
+        with:
+          environment: 'sit'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+          container-app-name: 'supergraph-gateway'
+        env:
+          CONTAINER_APP_ENV: 'sit'
+
+  uat_update_supergraph_secret:
+    name: Upload Latest UAT Supergraph
+    runs-on: digital-npe-ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.run_attempt > 1 && needs.check_build.outputs.hasInfraChanges == 'false'
+    needs: check_build
+    environment: graphql-gateway-uat
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🚀 Build & Upload Supergraph
+        uses: ./.github/actions/build-supergraph
+        with:
+          environment: 'uat'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+          container-app-name: 'supergraph-gateway'
+        env:
+          CONTAINER_APP_ENV: 'uat'
+
+  prd_update_supergraph_secret:
+    name: Upload Latest PRD Supergraph
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.run_attempt > 1 && needs.check_build.outputs.hasInfraChanges == 'false'
+    needs: check_build
+    environment: graphql-gateway-prd
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🚀 Build & Upload Supergraph
+        uses: ./.github/actions/build-supergraph
+        with:
+          environment: 'prd'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+          container-app-name: 'supergraph-gateway'
+        env:
+          CONTAINER_APP_ENV: 'prd'

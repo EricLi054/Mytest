@@ -1,0 +1,88 @@
+name: '🛡️ Codacy: UI, Gateway & SubGraphs'
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths-ignore:
+      - './infrastructure/**'
+      - './turbo/**'
+      - './tooling/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend_coverage:
+    name: Build, test and generate coverage report for Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: 👩‍💻 Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 💾 Cache turbo build setup
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: 🦺 Setup node and pnpm
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: 🧪 Test and Generate Coverage Report
+        run: pnpm run test:coverage:all
+
+      - name: 🚀 Set Env Variables for Codacy
+        shell: bash
+        run: |
+          echo 'CODACY_ORGANIZATION_PROVIDER="gh"' >> $GITHUB_ENV
+          echo "CODACY_USERNAME=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 1)" >> $GITHUB_ENV
+          echo "CODACY_PROJECT_NAME=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 2)" >> $GITHUB_ENV
+
+      - name: 📊 Push Coverage Report to codacy
+        run: |
+          bash <(curl -Ls https://coverage.codacy.com/get.sh) report --partial -l TypeScript ./coverage/lcov.info --organization-provider $CODACY_ORGANIZATION_PROVIDER --username $CODACY_USERNAME --project-name $CODACY_PROJECT_NAME
+        env:
+          CODACY_API_TOKEN: ${{ secrets.CODACY_API_TOKEN }}
+
+  backend_coverage:
+    runs-on: ubuntu-latest
+
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+    steps:
+      - name: 👩‍💻 Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🏗️ Build, test and generate coverage report for Backend
+        uses: ./.github/actions/codacy-dotnet-code-coverage
+        with:
+          working-directory: ./backend/subgraphs
+          is-partial: 'true'
+          codacy_api-token: ${{secrets.CODACY_API_TOKEN }}
+          nuget-token: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+
+  finalise_codacy_coverage:
+    name: Finalise Codacy Coverage
+    needs: [frontend_coverage, backend_coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Set Env Variables for Codacy
+        shell: bash
+        run: |
+          echo "CODACY_ORGANIZATION_PROVIDER=$(if [[ $GITHUB_SERVER_URL == "https://github.com" ]]; then echo "gh"; else echo "ghe"; fi)" >> $GITHUB_ENV
+          echo "CODACY_USERNAME=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 1)" >> $GITHUB_ENV
+          echo "CODACY_PROJECT_NAME=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 2)" >> $GITHUB_ENV
+
+      - name: ✅ Finalise Codacy Coverage
+        shell: bash
+        run: |
+          bash <(curl -Ls https://coverage.codacy.com/get.sh) final
+        env:
+          CODACY_API_TOKEN: ${{ secrets.CODACY_API_TOKEN }}

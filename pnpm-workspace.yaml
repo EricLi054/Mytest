@@ -1,0 +1,76 @@
+packages:
+  - frontend/apps/*
+  - frontend/packages/*
+  - frontend/static-content/*
+  - tooling/*
+  - backend/gateway
+catalog:
+  '@azure/identity': '4.7.0'
+  '@azure/keyvault-secrets': '4.9.0'
+  '@conform-to/react': '1.2.2'
+  '@conform-to/zod': '1.2.2'
+  '@contentful/rich-text-plain-text-renderer': '17.0.0'
+  '@contentful/rich-text-react-renderer': '16.0.1'
+  '@contentful/rich-text-types': '17.0.0'
+  '@emotion/cache': '11.14.0'
+  '@emotion/styled': '11.14.0'
+  '@faker-js/faker': '9.6.0'
+  '@fortawesome/free-solid-svg-icons': '6.7.2'
+  '@fortawesome/react-fontawesome': '0.2.2'
+  '@graphql-typed-document-node/core': '3.2.0'
+  '@playwright/test': '1.51.0'
+  '@racwa/analytics': '6.0.2'
+  '@racwa/react-components': '8.0.4'
+  '@racwa/styles': '7.0.2'
+  '@storybook/blocks': '8.6.4'
+  '@storybook/react': '8.6.4'
+  '@storybook/test': '8.6.4'
+  '@testing-library/jest-dom': '6.6.3'
+  '@testing-library/react': '16.2.0'
+  '@testing-library/user-event': '14.6.1'
+  '@vitejs/plugin-react-swc': '3.8.0'
+  '@vitest/coverage-istanbul': '3.0.8'
+  date-fns: '4.1.0'
+  dotenv: '16.4.7'
+  eslint: '9.22.0'
+  gql.tada: '1.8.10'
+  graphql: '16.10.0'
+  next-auth: '4.24.11'
+  next-cloudinary: '6.16.0'
+  playwright: '1.51.0'
+  prettier: '3.5.3'
+  server-only: '0.0.1'
+  typescript: '5.8.2'
+  vite: '6.2.1'
+  vitest: '3.0.8'
+  zod: '3.24.2'
+catalogs:
+  jquery:
+    # Locked to v3.5.1 as that's what supported by ADB2C Templates
+    '@types/jquery': '3.5.1'
+  mui:
+    '@mui/icons-material': '6.4.7'
+    '@mui/material': '6.4.7'
+    '@mui/material-nextjs': '6.4.3'
+    '@mui/system': '6.4.7'
+    '@mui/x-date-pickers': '7.27.3'
+  next15:
+    next: '15.2.1'
+    '@next/third-parties': '15.2.1'
+  node:
+    '@types/node': '22.13.10'
+  opentelemetry:
+    '@azure/monitor-opentelemetry': '1.9.0'
+    '@azure/monitor-opentelemetry-exporter': 1.0.0-beta.29
+    '@opentelemetry/api': '1.9.0'
+    '@opentelemetry/auto-instrumentations-node': '0.56.1'
+    '@opentelemetry/instrumentation': '0.57.2'
+    '@opentelemetry/resources': '1.30.1'
+    '@opentelemetry/sdk-trace-base': '1.30.1'
+    '@opentelemetry/sdk-trace-node': '1.30.1'
+    '@opentelemetry/semantic-conventions': '1.30.0'
+  react19:
+    'react': '19.0.0'
+    'react-dom': '19.0.0'
+    '@types/react-dom': '19.0.4'
+    '@types/react': '19.0.10'

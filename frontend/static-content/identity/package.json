@@ -1,0 +1,33 @@
+{
+  "name": "@racwa/identity-static-content",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev --port 3000",
+    "build": "astro check && astro build",
+    "build:dev": "env-cmd -f .env.dev astro build",
+    "build:sit": "env-cmd -f .env.sit astro build",
+    "astro": "astro",
+    "clean": "git clean -xdf .next .turbo node_modules",
+    "format": "prettier --check . --ignore-path ./.prettierignore",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "astro": "^5.2.6",
+    "postcss": "^8.5.2",
+    "postcss-nesting": "^13.0.1"
+  },
+  "devDependencies": {
+    "@racwa/eslint-config": "workspace:*",
+    "@racwa/prettier-config": "workspace:*",
+    "@types/jquery": "catalog:jquery",
+    "env-cmd": "10.1.0",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "prettier-plugin-astro": "0.14.1",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,77 @@
+supergraph-gateway:
+  resourceGroupName: rg-next-rac-com-au-${{ env }}
+  managedEnvironmentName: next-rac-env-${{ env }}
+  keyVaultName: next-rac-vault-${{ env }}
+  appConfigName: next-rac-appconfig-${{ env }}
+  appInsightsName: next-rac-app-insights-${{ env }}
+  tags: {}
+  properties:
+    workloadProfileName: Consumption
+    configuration:
+      secrets:
+        - name: supergraph-encryption-key
+      environmentVariables: []
+      activeRevisionsMode: Single
+      ingress:
+        external: true
+        targetPort: 4000
+        traffic:
+          - weight: 100
+            latestRevision: true
+        customDomains: []
+        ipSecurityRestrictions: []
+      dapr:
+        enabled: false
+        appId: backend
+        appProtocol: http
+        appPort: 4000
+    template:
+      revisionSuffix: ''
+      terminationGracePeriodSeconds:
+      containers:
+        - image: racwa.azurecr.io/rac-digital/supergraph-gateway
+          name: supergraph-gateway
+          env: []
+          resources:
+            cpu: 1
+            memory: 2Gi
+            ephemeralStorage: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          probes:
+            # https://learn.microsoft.com/en-us/azure/container-apps/health-probes?tabs=arm-template#default-configuration
+            - type: Liveness
+              failureThreshold: 10
+              httpGet:
+                path: /healthcheck
+                port: 4000
+                scheme: HTTP
+              initialDelaySeconds: 3
+              periodSeconds: 10
+              timeoutSeconds: 1
+            - type: Readiness
+              failureThreshold: 10
+              httpGet:
+                path: /readiness
+                port: 4000
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 3
+              timeoutSeconds: 2
+            - type: Startup
+              failureThreshold: 3
+              httpGet:
+                path: /healthcheck
+                port: 4000
+                scheme: HTTP
+              periodSeconds: 10
+              timeoutSeconds: 1
+      initContainers:
+      scale:
+        minReplicas: 0
+        maxReplicas: 1
+        rules:
+          - name: http-scaler
+            http:
+              metadata:
+                concurrentRequests: 100

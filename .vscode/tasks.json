@@ -1,55 +1,14 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "Client Run",
-            "type": "shell",
-            "command": "dapr run --app-id frontend --app-port 3000 --config ../dapr-config/config.yaml --resources-path ../dapr-components --dapr-http-port 3501 -- pnpm dev",
-            "linux": {
-                "command": "dapr run --app-id frontend --app-port 3000 --resources-path ../dapr-components --dapr-http-port 3501 -- pnpm dev"
-            },
-            "options": {
-                "cwd": "${workspaceFolder}/frontend"
-            },
-            "presentation": {
-                "group": "groupA",
-                "clear": true
-            }
-        },
-        {
-            "label": "Server Run",
-            "type": "shell",
-            "command": "dapr run --app-id backend --app-port 5078 --config ../../dapr-config/config.yaml --resources-path ../../dapr-components --dapr-http-port 3502 -- dotnet watch run",
-            "linux": {
-                "command": "dapr run --app-id backend --app-port 5078 --resources-path ../../dapr-components --log-level debug --dapr-http-port 3502 -- dotnet run"
-            },
-            "options": {
-                "cwd": "${workspaceFolder}/backend/DigitalPlatform.API"
-            },
-            "presentation": {
-                "group": "groupA",
-                "clear": true
-            },
-        },
-        {
-            "label": "Open Browser",
-            "type": "shell",
-            "command": "Start-Process http://localhost:3000",
-            "linux": {
-                "command": ""
-            },
-            "presentation": {
-                "reveal": "never",
-                "close": true
-            }
-        },
-        {
-            "label": "Run Dapr",
-            "dependsOn": [
-                "Client Run",
-                "Server Run",
-                "Open Browser"
-            ]
-        }
-    ]
-  }
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run GraphQL Gateway (Local)",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-File", "run-supergraph-gateway.ps1"],
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+---
+import ErrorCard from "./ErrorCard.astro";
+
+const myRacRegister = import.meta.env.PUBLIC_MYRAC_REGISTER_PAGE;
+---
+
+<ErrorCard
+  id="emailDoesNotExistError"
+  title="This email is not linked to an account."
+>
+  <p style="margin-top: 10px; margin-bottom: 10px;">
+    Check the email entered or <a href={myRacRegister}>Register now</a> to create
+    an account.
+  </p>
+  <p>
+    If you're still having issues, please call us on <a href="tel:1300045617"
+      >1300 045 617</a
+    >.
+  </p>
+</ErrorCard>
+
+<style>
+  p {
+    font-size: 16px;
+  }
+</style>

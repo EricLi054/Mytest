@@ -1,0 +1,274 @@
+﻿schema @link(url: "https:\/\/specs.apollo.dev\/federation\/v2.6", import: [ "@external", "@key", "@tag", "FieldSet" ]) {
+  query: Query
+  mutation: Mutation
+}
+
+interface Error {
+  message: String!
+}
+
+type ADB2CAccount {
+  id: UUID!
+  accountEnabled: Boolean!
+  displayName: String!
+  crmId: UUID
+}
+
+type Action {
+  type: String
+  label: String!
+  link: String
+  analytics: Analytics!
+  subActions: [SubAction!]!
+}
+
+type AddressLookup {
+  meta: AddressLookupMeta
+  data: [AddressLookupData!]
+}
+
+type AddressLookupData {
+  type: String!
+  id: String!
+  attributes: AddressLookupDataAttributes!
+}
+
+type AddressLookupDataAttributes {
+  partialAddress: String!
+  picklist: String!
+  postcode: String!
+  state: String!
+  score: String!
+}
+
+type AddressLookupMeta {
+  count: Int!
+}
+
+type Alert {
+  severity: String!
+  message: String!
+}
+
+type Analytics {
+  description: String!
+}
+
+type BundledAmount {
+  label: String!
+  title: String!
+  message: String!
+  bundledProducts: [BundledProduct!]!
+}
+
+type BundledProduct {
+  productName: String!
+  asset: String!
+}
+
+type DigitalCardDetails {
+  id: String!
+  passId: String
+  passUrl: String
+  isActive: Boolean!
+  numberOfPassesInstalled: Int!
+}
+
+type KeyValuePairOfStringAndBoolean {
+  key: String!
+  value: Boolean!
+}
+
+type Mutation {
+  requestPhysicalCard: RequestPhysicalCardPayload! @authorize @cost(weight: "10")
+}
+
+type PAFVerification {
+  data: PAFVerificationData
+  errors: [PAFVerificationError!]
+}
+
+type PAFVerificationAttributes {
+  verifyLevel: String
+  unitType: String!
+  unit: String!
+  buildingNumber: String!
+  subBuildingNumber: String!
+  buildingName: String!
+  buildingName2: String!
+  buildingLevelType: String!
+  buildingLevelNumber: String!
+  postalDeliveryTypes: String!
+  postalDeliveryNumber: String!
+  allotmentLot: String!
+  allotmentNumber: String!
+  streetName: String!
+  streetType: String!
+  streetTypeSuffix: String!
+  locality: String!
+  stateName: String!
+  stateCode: String!
+  postcode: String!
+  country: String!
+}
+
+type PAFVerificationData {
+  type: String!
+  id: String!
+  attributes: PAFVerificationAttributes!
+}
+
+type PAFVerificationError {
+  status: String!
+  title: String!
+  detail: String!
+}
+
+type PaymentFrequency {
+  title: String!
+  preMessage: String!
+  frequency: String!
+  message: String!
+  linkText: String!
+  link: String!
+}
+
+type PaymentMethod {
+  title: String!
+  type: String!
+  bsb: String!
+  accountNumber: String!
+  cardNumber: String!
+  cardExpiry: String!
+  linkText: String
+  link: String
+}
+
+type Person @key(fields: "personId racId") {
+  digitalCardDetails: DigitalCardDetails @cost(weight: "10")
+  personId: ID! @external
+  racId: ID! @external
+  personSystemIds: [PersonSystemId!]
+}
+
+type PersonSystemId {
+  system: String!
+  systemId: String!
+  isSynchronised: Boolean!
+}
+
+type PhysicalCardAlreadyOrdered implements Error {
+  message: String!
+}
+
+type PhysicalCardResponse {
+  isSuccess: Boolean!
+  value: String
+}
+
+type PolicyDetail {
+  type: String!
+  title: String!
+  subtitle: String!
+  subtitleSecondary: String
+  registrationNumber: String
+  policyItems: [PolicyItem!]!
+  alerts: [Alert!]
+  actions: [Action!]!
+}
+
+type PolicyItem {
+  label: String!
+  value: String!
+  paymentMethod: PaymentMethod
+  tooltip: Tooltip
+  paymentFrequency: PaymentFrequency
+  bundledAmount: BundledAmount
+}
+
+type Query {
+  policyDetails: [PolicyDetail!]! @authorize @cost(weight: "10")
+  featureToggles: [KeyValuePairOfStringAndBoolean!]! @cost(weight: "10")
+  addressList(partialAddress: String!): AddressLookup @authorize @cost(weight: "10")
+  validatePAF(moniker: String!): PAFVerification @authorize @cost(weight: "10")
+  adb2CAccount: ADB2CAccount @authorize @cost(weight: "10")
+  statusInformation: [StatusInformation!]! @cost(weight: "10")
+  _service: _Service!
+  _entities(representations: [_Any!]!): [_Entity]!
+}
+
+type RequestPhysicalCardPayload {
+  physicalCardResponse: PhysicalCardResponse
+  errors: [RequestPhysicalCardError!]
+}
+
+type StatusInformation {
+  name: String!
+  status: SystemStatus!
+}
+
+type SubAction {
+  label: String!
+  subLabel: String
+  link: String
+  analytics: Analytics!
+}
+
+type Tooltip {
+  title: String!
+  message: String!
+}
+
+"This type provides a field named sdl: String! which exposes the SDL of the service's schema. This SDL (schema definition language) is a printed version of the service's schema including the annotations of federation directives. This SDL does not include the additions of the federation spec."
+type _Service {
+  sdl: String!
+}
+
+union RequestPhysicalCardError = PhysicalCardAlreadyOrdered
+
+"Union of all types that key directive applied. This information is needed by the Apollo federation gateway."
+union _Entity = Person
+
+"Defines when a policy shall be executed."
+enum ApplyPolicy {
+  "Before the resolver was executed."
+  BEFORE_RESOLVER
+  "After the resolver was executed."
+  AFTER_RESOLVER
+  "The policy is applied in the validation step before the execution."
+  VALIDATION
+}
+
+enum SystemStatus {
+  HEALTHY
+  RESPONDING
+  DEGRADED
+  DOWN
+  UNABLE_TO_VERIFY
+}
+
+"The authorize directive."
+directive @authorize("The name of the authorization policy that determines access to the annotated resource." policy: String "Roles that are allowed to access the annotated resource." roles: [String!] "Defines when when the authorize directive shall be applied.By default the authorize directives are applied during the validation phase." apply: ApplyPolicy! = BEFORE_RESOLVER) repeatable on OBJECT | FIELD_DEFINITION
+
+"The purpose of the `cost` directive is to define a `weight` for GraphQL types, fields, and arguments. Static analysis can use these weights when calculating the overall cost of a query or response."
+directive @cost("The `weight` argument defines what value to add to the overall cost for every appearance, or possible appearance, of a type, field, argument, etc." weight: String!) on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | ENUM | INPUT_FIELD_DEFINITION
+
+"Directive to indicate that a field is owned by another service, for example via Apollo federation."
+directive @external on OBJECT | FIELD_DEFINITION
+
+"Used to indicate a combination of fields that can be used to uniquely identify and fetch an object or interface."
+directive @key(fields: FieldSet! resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
+
+"Links definitions within the document to external schemas."
+directive @link("Gets imported specification url." url: String! "Gets optional list of imported element names." import: [String!]) repeatable on SCHEMA
+
+"The `@specifiedBy` directive is used within the type system definition language to provide a URL for specifying the behavior of custom scalar definitions."
+directive @specifiedBy("The specifiedBy URL points to a human-readable specification. This field will only read a result for scalar types." url: String!) on SCALAR
+
+"Scalar representing a set of fields."
+scalar FieldSet
+
+scalar UUID @specifiedBy(url: "https:\/\/tools.ietf.org\/html\/rfc4122")
+
+"The _Any scalar is used to pass representations of entities from external services into the root _entities field for execution. Validation of the _Any scalar is done by matching the __typename and @external fields defined in the schema."
+scalar _Any

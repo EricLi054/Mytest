@@ -1,0 +1,653 @@
+---
+// ADB2C Email OTP
+
+// Scripts to uplift the experience provided by Microsoft
+// to the RAC designed one.
+
+// A `getPageDetails() => { url: string, title: string }` function should be
+// defined by the consuming page to get analytics events sent.
+
+import Reference from "./Reference.astro";
+
+interface Props {
+  /** The element ID expected for the email pages */
+  verificationControlId: string;
+  /** The title for the Enter Email page */
+  emailPageTitle: string;
+  /** The title for the Enter Email tab */
+  emailTabTitle: string;
+  /** The title for the Verify Email page */
+  verifyEmailPageTitle: string;
+  /** The title for the Verify Email tab */
+  verifyEmailTabTitle: string;
+  /** Whether the member can edit their email after providing it */
+  enableEmailEditing?: boolean;
+}
+
+const {
+  verificationControlId,
+  emailPageTitle,
+  emailTabTitle,
+  verifyEmailPageTitle,
+  verifyEmailTabTitle,
+  enableEmailEditing = false,
+} = Astro.props as Props;
+---
+
+<>
+  <Reference id="refVerificationControlId" value=`${verificationControlId}` />
+  <Reference id="refEmailPageTitle" value=`${emailPageTitle}` />
+  <Reference id="refEmailTabTitle" value=`${emailTabTitle}` />
+  <Reference id="refVerifyEmailPageTitle" value=`${verifyEmailPageTitle}` />
+  <Reference id="refVerifyEmailTabTitle" value=`${verifyEmailTabTitle}` />
+  <Reference id="refEnableEmailEditing" value=`${enableEmailEditing}` />
+</>
+
+<style is:inline>
+  #pageSubtitle {
+    font-size: 18px;
+    font-weight: 400;
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+
+  #emailVerificationControl_but_send_code,
+  #emailVerificationControlPasswordReset_but_send_code {
+    margin-top: 24px;
+  }
+
+  #verifyOtpButton,
+  #emailVerificationControl_but_verify_code,
+  #emailVerificationControlPasswordReset_but_verify_code {
+    margin-top: 20px;
+    margin-bottom: 20px;
+  }
+
+  #emailVerificationControl_label,
+  #emailVerificationControlPasswordReset_label,
+  #emailVerificationControl_success_message,
+  #emailVerificationControlPasswordReset_success_message,
+  #passwordEntryMismatch {
+    display: none !important;
+  }
+
+  #emailVerificationControl_but_send_new_code,
+  #emailVerificationControlPasswordReset_but_send_new_code,
+  .link-action {
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  #verificationCode {
+    margin-top: 24px;
+  }
+
+  #introEmail {
+    white-space: nowrap;
+    font-weight: 400;
+  }
+
+  .buttons {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+
+    > a,
+    span {
+      font-size: 14px;
+    }
+  }
+
+  .largeError {
+    display: flex !important;
+    justify-content: center;
+    width: 100%;
+    margin-top: 24px;
+    font-size: 18px;
+    text-align: center;
+  }
+</style>
+
+<script is:inline>
+  var initialConstantsSetInterval,
+    errorsSetInterval,
+    verifyCodeSetInterval,
+    automaticContinueSetInterval,
+    sendCodeLoadingModalSetInterval,
+    sendCodeErrorSetInterval,
+    sendCodeSetInterval,
+    customVerifyControlsSetInterval,
+    verifyErrorsSetInterval;
+
+  var pageTitle = "#pageTitle";
+  var sendCodeIntro = ".intro";
+  var submitCodeButton = "#continue";
+
+  var sendCodeButtonId,
+    sendCodeButton,
+    resendCodeButtonId,
+    resendCodeButton,
+    verifyCodeButtonId,
+    verifyCodeButton,
+    // Replacement button for Verify Code to enable better error handling
+    verifyOtpButtonId,
+    verifyOtpButton,
+    changeClaimsButtonId,
+    changeClaimsButton,
+    verifyErrorMessage,
+    verifySuccessMessage;
+
+  function sendEmailGtmPageView() {
+    if (typeof getPageDetails === "function") {
+      sendGtmPageView(getPageDetails());
+    }
+  }
+
+  function sendEmailGtmFieldTouched(field) {
+    if (typeof getPageDetails === "function") {
+      sendGtmFieldTouched(field, getPageDetails());
+    }
+  }
+
+  function sendEmailGtmCustomEvent(description) {
+    if (typeof getPageDetails === "function") {
+      sendGtmCustomEvent(description, getPageDetails());
+    }
+  }
+
+  initialConstantsSetInterval = setInterval(watchForInitialConstants, 40);
+
+  function watchForInitialConstants() {
+    var controlId = $("#refVerificationControlId").html();
+
+    if (controlId) {
+      sendCodeButtonId = `${controlId}_but_send_code`;
+      sendCodeButton = `#${sendCodeButtonId}`;
+
+      resendCodeButtonId = `${controlId}_but_send_new_code`;
+      resendCodeButton = `#${resendCodeButtonId}`;
+
+      verifyCodeButtonId = `${controlId}_but_verify_code`;
+      verifyCodeButton = `#${verifyCodeButtonId}`;
+      verifyOtpButtonId = "verifyOtpButton";
+      verifyOtpButton = `#${verifyOtpButtonId}`;
+
+      changeClaimsButtonId = `${controlId}_but_change_claims`;
+      changeClaimsButton = `#${changeClaimsButtonId}`;
+
+      verifyErrorMessage = `#${controlId}_error_message`;
+      verifySuccessMessage = `#${controlId}_success_message`;
+
+      clearInterval(initialConstantsSetInterval);
+      sendCodeSetInterval = setInterval(watchForSendCode, 30);
+      errorsSetInterval = setInterval(watchForErrors, 40);
+    }
+  }
+
+  function watchForErrors() {
+    if (isElementVisible(verifyErrorMessage)) {
+      var errorMessage = $(verifyErrorMessage).html();
+      errorMessage = errorMessage.replace("<br>", " ");
+
+      switch (errorMessage) {
+        case "Sorry, that code has expired. Please request a new code.":
+          $(verifyErrorMessage).html(
+            "Sorry, that code has expired.<br>Please request a new code.",
+          );
+          $(verifyErrorMessage).addClass("largeError");
+          break;
+        case "Sorry, you have exceeded 5 attempts. Please request a new code.":
+          $(verifyErrorMessage).html(
+            "Sorry, you have exceeded 5 attempts.<br>Please request a new code.",
+          );
+          $(verifyErrorMessage).addClass("largeError");
+          break;
+        case "Sorry, that code doesn't match. Please try again or request a new code.":
+          $(verifyErrorMessage).html(
+            "Sorry, that code doesn't match.<br>Please try again or request a new code.",
+          );
+          $(verifyErrorMessage).addClass("largeError");
+          break;
+        case "An account with this email address already exists.":
+          $(verifyErrorMessage).hide();
+          $("#emailAlreadyLinkedError").show();
+          break;
+        case "We are unable to find any account with this email.":
+          $(verifyErrorMessage).hide();
+          $("#emailDoesNotExistError").show();
+          break;
+        default:
+          $(verifyErrorMessage).removeClass("largeError");
+          break;
+      }
+    }
+  }
+
+  function watchForSendCode() {
+    if (isElementVisible(sendCodeButton)) {
+      performEmailUxMods();
+      setupSendCode();
+      setupEmailInputs();
+      clearInterval(sendCodeSetInterval);
+    }
+  }
+
+  function performEmailUxMods() {
+    sendEmailGtmPageView();
+    setIntroForEmail();
+    $(sendCodeButton).html("Send code");
+    $(".verificationErrorText.error").insertAfter("#emailAddress");
+    $("#emailAddress").attr("placeholder", "name@example.com");
+    $("label[for='emailAddress']").text("Email");
+
+    var $alertLbl = $("#emailAddress").prev(".itemLevel");
+    $alertLbl.insertAfter($alertLbl.parent().find("#emailAddress"));
+
+    $("#verificationCode").attr("placeholder", "e.g. 123456");
+
+    $(
+      "<button id='verifyOtpButton' style='display: none'>Verify</button>",
+    ).insertBefore($(verifyCodeButton));
+    $(verifyCodeButton).wrap("<div style='display: none'></div>");
+    $(verifyOtpButton).on("click", onVerifyCodeClick);
+  }
+
+  function setIntroForEmail() {
+    $(sendCodeIntro).html(
+      "<p style='margin-bottom: 16px'>To keep your information secure, we'll send a verification code to your inbox.</p>",
+    );
+  }
+
+  function replaceEmailCancelButton() {
+    const racHomePageUrl = $("#refRacHomePage").html();
+    $("<a id='cancel-link'>Cancel</a>").insertAfter("#cancel");
+    $("#cancel").remove();
+
+    $("#cancel-link").on("click", function () {
+      sendEmailGtmCustomEvent("Cancel");
+      window.location.href = racHomePageUrl;
+    });
+  }
+
+  function setupSendCode() {
+    $(submitCodeButton).hide();
+    $(sendCodeIntro).show();
+
+    verifyCodeSetInterval = setInterval(watchForVerifyCode, 100);
+    sendCodeErrorSetInterval = setInterval(watchForSendCodeError, 70);
+    sendCodeLoadingModalSetInterval = setInterval(
+      watchForSendCodeLoadingModal,
+      55,
+    );
+  }
+
+  var emailFieldGainedFocus = false;
+  var showEmailErrors = false;
+  var otpFieldGainedFocus = false;
+  var showOtpErrors = false;
+
+  function setupEmailInputs() {
+    $("<style>.error.itemLevel { display: none !important; }</style>").appendTo(
+      "head",
+    );
+    $(
+      "<p id='emailError' class='errorMessage' style='display: none'></p>",
+    ).insertAfter("#emailAddress");
+    $(
+      "<p id='otpError' class='errorMessage' style='display: none'></p>",
+    ).insertAfter("#verificationCode");
+
+    replaceEmailCancelButton();
+
+    $("#emailDoesNotExistError").insertBefore($(".buttons").first());
+    $("#emailDoesNotExistError").css("margin-top", "30px");
+
+    $("#emailAlreadyLinkedError").insertBefore($(".buttons").first());
+    $("#emailAlreadyLinkedError").css("margin-top", "30px");
+
+    $("#verificationCode").on("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+      }
+    });
+
+    $(sendCodeButton).on("click", function () {
+      sendEmailGtmCustomEvent("Send code");
+    });
+
+    $(verifyCodeButton).on("click", function () {
+      sendEmailGtmCustomEvent("Verify");
+    });
+
+    $("#emailAddress").on("input", function () {
+      $(verifyErrorMessage).removeClass("largeError");
+      $(verifyErrorMessage).hide();
+      validateEmail();
+    });
+
+    $("#verificationCode").on("input", function () {
+      $(verifyErrorMessage).removeClass("largeError");
+      $(verifyErrorMessage).hide();
+      validateOtp();
+    });
+
+    $("#emailAddress").on("focus", function () {
+      emailFieldGainedFocus = true;
+    });
+
+    $("#verificationCode").on("focus", function () {
+      otpFieldGainedFocus = true;
+    });
+
+    $("#emailAddress").on("blur", function () {
+      sendEmailGtmFieldTouched("Email address");
+    });
+
+    $("#verificationCode").on("blur", function () {
+      sendEmailGtmFieldTouched("Verify your email address");
+    });
+
+    $(document).on("click", function (event) {
+      var elementClicked = event.target.id;
+      var clickedOutsideEmailField = elementClicked !== "emailAddress";
+      var clickedOutsideOtpField = elementClicked !== "verificationCode";
+      var sendCodeClicked = elementClicked === sendCodeButtonId;
+      var verifyCodeClicked = elementClicked === verifyOtpButtonId;
+
+      // Transitioning back to Email
+      if (elementClicked === changeClaimsButtonId) {
+        emailFieldGainedFocus = false;
+        showEmailErrors = false;
+        setEmailErrorState(false);
+        return;
+      }
+
+      // Transitioning to Verify Code again
+      if (elementClicked === sendCodeButtonId) {
+        otpFieldGainedFocus = false;
+        showOtpErrors = false;
+        setOtpErrorState(false);
+        return;
+      }
+
+      if (isElementVisible("#emailAddress")) {
+        if (
+          (clickedOutsideEmailField && emailFieldGainedFocus) ||
+          sendCodeClicked
+        ) {
+          showEmailErrors = true;
+          validateEmail();
+        }
+      }
+
+      if (isElementVisible("#verificationCode")) {
+        if (
+          (clickedOutsideOtpField && otpFieldGainedFocus) ||
+          verifyCodeClicked
+        ) {
+          showOtpErrors = true;
+          validateOtp();
+        }
+      }
+    });
+  }
+
+  function validateEmail() {
+    if (!showEmailErrors) {
+      return;
+    }
+
+    var email = $("#emailAddress").val();
+    var regex = $("#emailAddress").prop("pattern");
+
+    if (email.length === 0) {
+      const noEmailError = "This field is required";
+
+      if ($("#emailError").html() !== noEmailError) {
+        sendEmailGtmCustomEvent("No email entered error validation");
+      }
+
+      setEmailErrorState(noEmailError);
+      return;
+    }
+
+    if (!new RegExp(regex).test(email)) {
+      const invalidEmailError = "Please enter a valid email";
+
+      if ($("#emailError").html() !== invalidEmailError) {
+        sendEmailGtmCustomEvent("Email not valid error validation");
+      }
+
+      setEmailErrorState(invalidEmailError);
+      return;
+    }
+
+    setEmailErrorState(false);
+  }
+
+  function validateOtp() {
+    if (!showOtpErrors) {
+      setOtpErrorState(false);
+      return;
+    }
+
+    var otp = $("#verificationCode").val();
+    var regex = /^\d{6}$/;
+
+    if (otp.length === 0) {
+      var noOtpError = "Please enter a verification code";
+
+      if ($("#otpError").html() !== noOtpError) {
+        sendEmailGtmCustomEvent("No code entered error validation");
+      }
+
+      setOtpErrorState(noOtpError);
+      return;
+    }
+
+    if (!regex.test(otp)) {
+      var invalidOtpError = "Please enter a valid six-digit code.";
+
+      if ($("#otpError").html() !== invalidOtpError) {
+        sendEmailGtmCustomEvent("Incomplete code error validation");
+      }
+
+      setOtpErrorState(invalidOtpError);
+      return;
+    }
+
+    setOtpErrorState(false);
+  }
+
+  function setEmailErrorState(errorMessage) {
+    if (errorMessage) {
+      $("#emailError").html(errorMessage);
+      $("#emailError").show();
+      $("#emailAddress").addClass("formError");
+      $("#emailAddress_label").addClass("formError");
+    } else {
+      $("#emailError").html("");
+      $("#emailError").hide();
+      $("#emailAddress").removeClass("formError");
+      $("#emailAddress_label").removeClass("formError");
+    }
+  }
+
+  function setOtpErrorState(errorMessage) {
+    if (errorMessage) {
+      $("#otpError").html(errorMessage);
+      $("#otpError").show();
+      $("#verificationCode").addClass("formError");
+    } else {
+      $("#otpError").html("");
+      $("#otpError").hide();
+      $("#verificationCode").removeClass("formError");
+    }
+  }
+
+  function watchForSendCodeLoadingModal() {
+    if (
+      !isElementVisible(sendCodeButton) &&
+      !isElementVisible("#newPassword") &&
+      !isElementVisible(verifyErrorMessage) &&
+      !isElementVisible(changeClaimsButton) &&
+      !isElementVisible(verifyCodeButton)
+    ) {
+      $(".errorBox").hide();
+      $("#emailAddress").hide();
+      $("label[for=emailAddress]").hide();
+      hideLoadingModal();
+      showLoadingModal("Sending");
+      sendCodeErrorSetInterval = setInterval(watchForSendCodeError, 30);
+      clearInterval(sendCodeLoadingModalSetInterval);
+    }
+  }
+
+  function watchForVerifyCode() {
+    if (isElementVisible(verifyCodeButton)) {
+      $(pageTitle).text($("#refVerifyEmailPageTitle").html());
+      $("title").text($("#refVerifyEmailTabTitle").html());
+      sendEmailGtmPageView();
+
+      $(submitCodeButton).hide();
+      $("#emailAddress").hide();
+      $("label[for=emailAddress]").hide();
+      $("label[for=verificationCode]").hide();
+      $(verifySuccessMessage).hide();
+
+      otpFieldGainedFocus = false;
+      showOtpErrors = false;
+      setOtpErrorState(false);
+
+      $("#alertCodeExpiry").show();
+      $(verifyOtpButton).show();
+      $(".verificationErrorText").insertAfter("#otpError");
+
+      $(resendCodeButton).on("click", onResendCodeClicked);
+      $(resendCodeButton).text("Re-send code");
+      $(resendCodeButton).addClass("btn-link");
+      $(resendCodeButton).after(
+        "<span id='call-us' class='link-action'>Need help? <a id='call-us-number' href='tel:1300045617'>1300 045 617</a></span>",
+      );
+
+      if ($("#refEnableEmailEditing").html() === "true") {
+        const backLink = $("<a>", {
+          id: "re-enter-email",
+          href: "javascript:void(0);",
+          text: "Re-enter your email address",
+          class: "link-action",
+          click: function () {
+            sendEmailGtmCustomEvent("Re-enter your email address");
+            $(pageTitle).text($("#refEmailPageTitle").html());
+            $("title").text($("#refEmailTabTitle").html());
+            sendEmailGtmPageView();
+
+            setIntroForEmail();
+            $("#emailAddress").show();
+            $("label[for=emailAddress]").show();
+            $("#re-enter-email").remove();
+            $("#call-us").remove();
+            $("#alertCodeExpiry").hide();
+            $(verifyOtpButton).hide();
+            $(changeClaimsButton).trigger("click");
+            setupSendCode();
+          },
+        });
+
+        $(resendCodeButton).after(backLink);
+      }
+
+      $("#call-us-number").on("click", function () {
+        sendEmailGtmCustomEvent("Need help 1300 045 617");
+      });
+
+      var $alertLbl = $("#verificationCode").prev(".itemLevel");
+      $alertLbl.insertAfter($alertLbl.parent().find("#verificationCode"));
+
+      var emailAddress = $("#emailAddress").val();
+      $(sendCodeIntro).html(
+        `<p style="text-align: center">Please enter the verification code sent to <span id="introEmail">${emailAddress}</span></p>`,
+      );
+
+      automaticContinueSetInterval = setInterval(watchAutomaticContinue, 50);
+      clearInterval(verifyCodeSetInterval);
+      hideLoadingModal();
+    }
+  }
+
+  function watchForSendCodeError() {
+    if (isElementVisible(verifyErrorMessage)) {
+      if (isElementVisible(resendCodeButton)) {
+        $("#emailAddress").hide();
+        $("label[for=emailAddress]").hide();
+      } else {
+        $("#emailAddress").show();
+        $("label[for=emailAddress]").show();
+      }
+
+      emailFieldGainedFocus = false;
+      showEmailErrors = false;
+      $("#verificationCode").addClass("formError");
+      $(submitCodeButton).hide();
+      clearInterval(sendCodeErrorSetInterval);
+      sendCodeLoadingModalSetInterval = setInterval(
+        watchForSendCodeLoadingModal,
+        50,
+      );
+      hideLoadingModal();
+    }
+  }
+
+  function watchForVerifyErrors() {
+    if (isElementVisible(verifyErrorMessage)) {
+      otpFieldGainedFocus = false;
+      showOtpErrors = false;
+      $("#verificationCode").show();
+
+      clearInterval(verifyErrorsSetInterval);
+    }
+  }
+
+  function onVerifyCodeClick(event) {
+    event.preventDefault();
+    if (/^\d{6}$/.test($("#verificationCode").val())) {
+      $(verifyErrorMessage).removeClass("largeError");
+      $(verifyErrorMessage).hide();
+      verifyErrorsSetInterval = setInterval(watchForVerifyErrors, 50);
+      showLoadingModal("Submitting");
+      $(verifyCodeButton).trigger("click");
+    }
+
+    return true;
+  }
+
+  function onResendCodeClicked(event) {
+    event.preventDefault();
+    otpFieldGainedFocus = false;
+    showOtpErrors = false;
+    setOtpErrorState(false);
+    $(verifyErrorMessage).removeClass("largeError");
+    $(verifyErrorMessage).hide();
+    sendEmailGtmCustomEvent("Re-send code");
+
+    showLoadingModal("Sending");
+    customVerifyControlsSetInterval = setInterval(showCustomVerifyControls, 50);
+    return true;
+  }
+
+  function showCustomVerifyControls() {
+    if (isElementVisible(verifyCodeButton)) {
+      clearInterval(customVerifyControlsSetInterval);
+      hideLoadingModal();
+      $("#verificationCode").show();
+    }
+  }
+
+  function watchAutomaticContinue() {
+    if (isElementVisible(changeClaimsButton)) {
+      $("#api").hide();
+      $(submitCodeButton).trigger("click");
+      clearInterval(automaticContinueSetInterval);
+    }
+  }
+</script>

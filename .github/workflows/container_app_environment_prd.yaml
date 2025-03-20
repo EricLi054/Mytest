@@ -1,0 +1,49 @@
+name: '🏗️ Infra: Container App Environment (Prd)'
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/container_app_environment_prd.yaml
+      - infrastructure/container_app_environment/prd/**
+      - infrastructure/modules/container-app-environment/**
+    branches:
+      - main
+      - 'release/**'
+
+  push:
+    paths:
+      - .github/workflows/container_app_environment_prd.yaml
+      - infrastructure/container_app_environment/prd/**
+      - infrastructure/modules/container-app-environment/**
+    branches:
+      - main
+      - 'release/**'
+
+jobs:
+  terraform:
+    uses: ./.github/workflows/deploy_terraform_cloud_workflow.yaml
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    with:
+      arm_subscription_id: 'bc8c0622-7aa0-4a8b-8e07-9222ea6b0f02'
+      blast_radius_calculation: true
+      i_like_fun: true
+      compare_plan: true
+      use_saved_plan: true
+      apply_empty_plan: false
+      tf_skip_apply: ${{ github.event_name == 'pull_request' }}
+      tf_dir: infrastructure/container_app_environment/prd/
+      tf_plan_environment: prd
+      tf_apply_environment: prd
+      tf_backend_storage_account: 'racwaplatformtfstate'
+      tf_backend_resource_group: 'platform-terraform-state'
+      tf_backend_container: 'react-monorepo'
+      tf_backend_key: 'container_app_environment_prd.tfstate'
+      tf_backend_subscription_id: '18ebc478-c4af-4365-a746-9026391a40da'
+      tf_options_plan: -input=false
+      tf_options_apply: -input=false -auto-approve
+      use_federated_credentials: true
+      tf_backend_use_azuread_auth: true

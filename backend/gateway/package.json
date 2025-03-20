@@ -1,0 +1,32 @@
+{
+  "name": "@racwa/gateway",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "scripts": {
+    "clean": "git clean -xdf .next .turbo node_modules",
+    "build": "echo 'No build step'",
+    "compose": "set CONTAINER_APP_ENV=local && tsx scripts/compose-gateway.ts",
+    "ci:compose": "DEBUG=Mesh:* tsx scripts/compose-gateway.ts",
+    "dev": "set CONTAINER_APP_ENV=local && tsx scripts/run-gateway.ts",
+    "serve": "pnpm compose && pnpm dev"
+  },
+  "dependencies": {
+    "@azure/monitor-opentelemetry-exporter": "catalog:opentelemetry",
+    "@graphql-hive/gateway": "1.10.4",
+    "@opentelemetry/resources": "catalog:opentelemetry",
+    "@opentelemetry/sdk-trace-base": "catalog:opentelemetry",
+    "@opentelemetry/sdk-trace-node": "catalog:opentelemetry",
+    "@opentelemetry/semantic-conventions": "catalog:opentelemetry",
+    "graphql": "catalog:"
+  },
+  "devDependencies": {
+    "@graphql-mesh/compose-cli": "1.4.1",
+    "@racwa/app-config": "workspace:*",
+    "@racwa/tsconfig": "workspace:*",
+    "tsx": "4.19.3"
+  }
+}

@@ -1,63 +1,93 @@
-### DotnetCore ###
-# .NET Core build folders
-bin/
-obj/
+# See http://help.github.com/ignore-files/ for more about ignoring files.
 
-**/.vs/
+test-report.xml
 
-# Common node modules locations
-**/node_modules
-**/wwwroot/node_modules
+# compiled output
+/lib
+/build
+dist/
+/tmp
+**/storybook-static/
+**/coverage/
 
-### NextJS ###
 # dependencies
-**/.pnp
+node_modules/
+/.pnp
 .pnp.js
-.npmrc
 
-# testing
-**/coverage
-coverage.cobertura.xml
-junit.xml
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+.vs/
+[Oo]bj/
+bin/
+.turbo
 
-# next.js
-**/.next/
-**/out/
-**/.swc/
-
-# .dapr
-**/.dapr/
-
-# production
-**/build
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/frontend-rac.digital.code-workspace
 
 # misc
-.DS_Store
-*.pem
+/.sass-cache
+/connect.lock
+/coverage/*
+/libpeerconnection.log
+npm-debug.log
+testem.log
+/typings
+.env.development.local
+.env.test.local
+.env.production.local
+**junit.xml
+/coverage
+build-storybook.log
+chromatic-diagnostics.json
+chromatic.log
 
-# debug
+# e2e
+/e2e/*.js
+/e2e/*.map
+
+#System Files
+.DS_Store
+Thumbs.db
+
+# production
+/build
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+debug.log
+.eslintcache
+**.bak
+.swc/
 
-# local env files
-.env*.local
-*.local*
-.env
+*storybook.log
 
-# vercel
-.vercel
+.next/
+**/out/
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/playwright/.cache/
+**/playwright-screenshots/
+**/*.local
+.mesh/
+.dapr/
+*.local
+!.env.local
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-### Terraform ###
 # Local .terraform directories
 **/.terraform/*
-# Local .terraform file
-**/.terraform*
 
 # .tfstate files
 *.tfstate
@@ -68,12 +98,11 @@ crash.log
 crash.*.log
 
 # Exclude all .tfvars files, which are likely to contain sensitive data, such as
-# password, private keys, and other secrets. These should not be part of version
-# control as they are data points which are potentially sensitive and subject
+# password, private keys, and other secrets. These should not be part of version 
+# control as they are data points which are potentially sensitive and subject 
 # to change depending on the environment.
 *.tfvars
 *.tfvars.json
-!npe-parameters.tfvars
 
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
@@ -81,6 +110,9 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# Ignore transient lock info files created by terraform apply
+.terraform.tfstate.lock.info
 
 # Include override files you do wish to add to version control using negated pattern
 # !example_override.tf
@@ -91,20 +123,4 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
-
-# Ignore Storybook logs
-*storybook.log
-**/storybook-static
-
-# Ignore npm package lock (this repo utilises pnpm)
-package-lock.json
-
-# Playwright
-**/test-results
-**/playwright-report
-**/playwright/.cache
-
-**/.pnpm-store/*
-**/.sqllite/*
-
-**/local-data/*
+frontend/packages/gql/schema.main.graphql

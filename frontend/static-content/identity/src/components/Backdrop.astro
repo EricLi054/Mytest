@@ -1,0 +1,72 @@
+---
+// Backdrop
+
+// A loading modal that can be shown with or without text. It will hide
+// the #content-box element when the spinner is shown.
+
+import spinner from "../../public/icons/spinner.svg";
+---
+
+<div id="backdrop">
+  <img src=`${spinner.src}` id="backdrop-spinner" alt="Loading..." />
+  <p id="backdrop-text">Loading...</p>
+</div>
+
+<script is:inline>
+  function showLoadingModal(message) {
+    $("#backdrop-text").html(message ? message : "");
+    $("#backdrop").addClass("active");
+    $("#content-box").hide();
+  }
+
+  function hideLoadingModal() {
+    $("#content-box").show();
+    $("#backdrop").removeClass("active");
+    $("#backdrop-text").html("");
+  }
+</script>
+
+<style>
+  #backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(24, 45, 60, 0.8);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    display: none;
+
+    &.active {
+      display: flex;
+    }
+  }
+
+  #backdrop-spinner {
+    width: 56px;
+    height: 56px;
+    color: white;
+    animation: spin 2s linear infinite;
+  }
+
+  #backdrop-text {
+    color: white;
+    margin-top: 16px;
+    font-size: 16px;
+    font-family: "Stag Sans Web", Helvetica, Arial, sans-serif;
+    font-weight: 400;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+</style>

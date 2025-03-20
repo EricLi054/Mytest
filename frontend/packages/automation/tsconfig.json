@@ -1,0 +1,9 @@
+{
+  "extends": "@racwa/tsconfig/internal-package.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable"]
+  },
+  "include": ["*.ts", "src"],
+  "exclude": ["node_modules"],
+  "resolveJsonModule": true
+}

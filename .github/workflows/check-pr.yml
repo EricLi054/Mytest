@@ -1,0 +1,99 @@
+name: '🛡️ Pull Request'
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize, ready_for_review]
+
+jobs:
+  check_pull_request:
+    name: Check & Validate
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check PR Title
+        id: check_pr_title
+        if: github.event.action == 'opened' || github.event.action == 'edited'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $pattern = ""
+          $example = ""
+          $pattern = $env:SIMPLE_PR_PATTERN
+          $example = "DED-1234: Fix test"
+
+          $validTitle = $env:PR_TITLE -match $pattern
+          if($validTitle) {
+            Write-Output "PR title matches pattern"
+            return;
+          }
+
+          $inferred = $env:BRANCH_NAME -match $env:BRANCH_CAPTURE
+          if($inferred) {
+            $descriptionLower = $matches.description.Replace("-", " ");
+            $descriptionSentence = $descriptionLower.Substring(0, 1).ToUpper() + $descriptionLower.Substring(1);
+            $inferredTitle = "$($matches.ticket.ToUpper()) ($($matches.type.ToUpper())): $descriptionSentence";
+            $inferredTitle = "$($matches.ticket.ToUpper()): $descriptionSentence";
+            gh pr edit ${{github.event.number}} --title $inferredTitle;
+            Write-Host "PR Title inferred";
+          } else {
+            $message = "The PR title did not match the following pattern: ``n ````$pattern```` ``n``nFor example: ````$example```` ``n``nPlease update the title of this pull request to fix the issue, and then dismiss the request changes noting that you have fixed it.";
+            echo "changes-requested=$message" >> $env:GITHUB_OUTPUT;
+          }
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          SIMPLE_PR_PATTERN: '^[A-Z0-9]+-\d+:( .+)'
+          PR_PATTERN: '^[A-Z0-9]+-\d+( \((FEATURE|BUGFIX|HOTFIX|RELEASE|CHORES?|TASKS?)\))?:( .+)'
+          BRANCH_NAME: ${{ github.head_ref }}
+          BRANCH_CAPTURE: '(?<type>\w+)\/(?<ticket>\w+-\d+)-(?<description>[\w-]+)'
+
+      - name: Check PR Branch Name
+        id: check_branch_name
+        if: github.event.action == 'opened'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          if ($env:BRANCH_NAME -match $env:BRANCH_PATTERN) {
+            Write-Output "Branch name matches pattern"
+          } else {
+            $message = "The branch name did not match following pattern: ``n ````$env:BRANCH_PATTERN```` ``n``nFor example: ````bugfix/DED-1234-example-branch-name```` ``n``nPlease close this PR, rename your branch and re-raise this PR."
+            echo "changes-requested=$message" >> $env:GITHUB_OUTPUT;
+          }
+        env:
+          BRANCH_PATTERN: '^(feature|hotfix|bugfix|release|tasks?|chores?)\/([\w]{1,10})-\d+(.+)?'
+          BRANCH_NAME: ${{ github.head_ref }}
+
+      - name: Request Changes
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $aggregatedMessage = "# PR Check Failure";
+
+          $pictureNumber = (Get-Random -Minimum 0 -Maximum 4) + 1;
+          $pullRequestImage = "https://github.com/racwa/raci-spark-pipelines/blob/main/.github/workflows/assets/request-changes-$pictureNumber.jpg?raw=true"
+          $aggregatedMessage += "`n![request-changes]($pullRequestImage)`n`n";
+
+          $initialMessage = "`nThis pull request did not pass all checks, please follow the instructions given below each failed check:";
+          $aggregatedMessage += $initialMessage;
+
+          if( "${{ steps.check_pr_title.outputs.changes-requested }}" )
+          {
+            $aggregatedMessage += "`n`n### PR Title"
+            $aggregatedMessage += "`n${{ steps.check_pr_title.outputs.changes-requested }}"
+          }
+
+          if( "${{ steps.check_branch_name.outputs.changes-requested }}" )
+          {
+            $aggregatedMessage += "`n`n### Branch Name";
+            $aggregatedMessage += "`n${{ steps.check_branch_name.outputs.changes-requested }}"
+          }
+
+          if( !$aggregatedMessage.EndsWith($initialMessage) )
+          {
+            gh pr review ${{ github.event.number }} --request-changes --body $aggregatedMessage;
+          }
+          else
+          {
+            echo "All PR Checks passed";
+          }

@@ -1,0 +1,51 @@
+name: '🏗️ Infra: App Gateway (PRD)'
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/app_gateway_prd.yaml
+      - infrastructure/application_gateway/prd/**
+      - infrastructure/modules/terraform-azure-app-gateway/**
+      - infrastructure/modules/web-application-firewallpolicy/**
+    branches:
+      - main
+
+  push:
+    paths:
+      - .github/workflows/app_gateway_prd.yaml
+      - infrastructure/application_gateway/prd/**
+      - infrastructure/modules/terraform-azure-app-gateway/**
+      - infrastructure/modules/web-application-firewallpolicy/**
+    branches:
+      - main
+
+jobs:
+  terraform:
+    uses: ./.github/workflows/deploy_terraform_cloud_workflow.yaml
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    with:
+      arm_subscription_id: 'bc8c0622-7aa0-4a8b-8e07-9222ea6b0f02'
+      blast_radius_calculation: true
+      i_like_fun: true
+      compare_plan: true
+      use_saved_plan: true
+      apply_empty_plan: false
+      tf_dir: infrastructure/application_gateway/prd
+      tf_apply_branch: main
+      tf_skip_apply: ${{ github.event_name == 'pull_request' }}
+      tf_apply_environment: prd
+      tf_plan_environment: prd
+      tf_backend_storage_account: 'racwaplatformtfstate'
+      tf_backend_resource_group: 'platform-terraform-state'
+      tf_backend_container: 'react-monorepo'
+      tf_backend_key: 'application_gateway_prd.tfstate'
+      tf_backend_subscription_id: '18ebc478-c4af-4365-a746-9026391a40da'
+      tf_options_plan: -input=false
+      tf_options_apply: -input=false -auto-approve
+      use_federated_credentials: true
+      tf_backend_use_azuread_auth: true
+    secrets:
+      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

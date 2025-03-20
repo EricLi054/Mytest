@@ -1,0 +1,217 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Person", "Person\Person.csproj", "{9591501A-A5C2-415B-8C45-7B504553FE6F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Motoring", "Motoring\Motoring.csproj", "{9A1547AB-DB55-47FD-8F15-F5E03A7E6720}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{424D2D7A-B525-419D-AACD-A8CF4F483CB4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{965A7FE7-C18E-40D7-A146-68F75AA0BC05}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Person.Tests", "tests\Person.Tests\Person.Tests.csproj", "{11508C15-603C-44B4-B354-B21D5B169B51}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "config", "config", "{AFDCB1F5-7B50-495A-BE67-CF5851B6784A}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		.runsettings = .runsettings
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shared", "Shared\Shared.csproj", "{26071144-CEDE-45D0-8008-79CF4BCA517E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shared.Tests", "tests\Shared.Tests\Shared.Tests.csproj", "{4AE6F328-6ACD-4A85-B493-EF04442457DC}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Motoring.Tests", "tests\Motoring.Tests\Motoring.Tests.csproj", "{DAAE6AC2-19B8-45AA-B212-A809C308ED80}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Membership", "Membership\Membership.csproj", "{7187D31F-3BD3-48F7-971D-07E4119E1048}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Membership.Tests", "tests\Membership.Tests\Membership.Tests.csproj", "{D3143D18-A3E0-47FF-92A7-39DB23F67390}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Insurance", "Insurance\Insurance.csproj", "{395BBE83-B41D-405F-B8FA-DC37A1093A6E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Insurance.Tests", "tests\Insurance.Tests\Insurance.Tests.csproj", "{3FE5BC18-5603-4F71-BE53-2D3320CE8C2E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "infra", "infra", "{235D819C-A4E1-4E4E-8EFB-8FCC7EAD66EB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Insurance", "Insurance", "{CFBB5BB3-86C2-48E5-B9F0-3AC03E3A461B}"
+	ProjectSection(SolutionItems) = preProject
+		Insurance\Dockerfile = Insurance\Dockerfile
+		Insurance\infra\templates\resources\container-app\insurance-subgraph-template.yaml = Insurance\infra\templates\resources\container-app\insurance-subgraph-template.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dev", "Dev", "{CA0BB8A7-B9C9-43BB-AF3D-1CED22B5CC3A}"
+	ProjectSection(SolutionItems) = preProject
+		Insurance\infra\dev\resources\container-app\insurance-subgraph.yaml = Insurance\infra\dev\resources\container-app\insurance-subgraph.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sit", "Sit", "{47690E18-BDBC-4468-BB36-E80020DA277F}"
+	ProjectSection(SolutionItems) = preProject
+		Insurance\infra\sit\resources\container-app\insurance-subgraph.yaml = Insurance\infra\sit\resources\container-app\insurance-subgraph.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Membership", "Membership", "{3B0DD25D-055F-4C59-B708-B9CA1A5D41B4}"
+	ProjectSection(SolutionItems) = preProject
+		Membership\Dockerfile = Membership\Dockerfile
+		Membership\infra\templates\resources\container-app\membership-subgraph-template.yaml = Membership\infra\templates\resources\container-app\membership-subgraph-template.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Motoring", "Motoring", "{77589030-F667-459F-A1D1-3CC71C26AC1C}"
+	ProjectSection(SolutionItems) = preProject
+		Motoring\Dockerfile = Motoring\Dockerfile
+		Motoring\infra\templates\resources\container-app\motoring-subgraph-template.yaml = Motoring\infra\templates\resources\container-app\motoring-subgraph-template.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Person", "Person", "{3D7A8FD7-72CF-46F0-9B80-90F909915A96}"
+	ProjectSection(SolutionItems) = preProject
+		Person\Dockerfile = Person\Dockerfile
+		Person\infra\templates\resources\container-app\person-subgraph-template.yaml = Person\infra\templates\resources\container-app\person-subgraph-template.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dev", "Dev", "{C5F5147D-0F74-421C-8E1A-1463539D9A87}"
+	ProjectSection(SolutionItems) = preProject
+		Membership\infra\dev\resources\container-app\membership-subgraph.yaml = Membership\infra\dev\resources\container-app\membership-subgraph.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dev", "Dev", "{6A4BB5E9-9F8C-41D9-902B-5469CB71B8C5}"
+	ProjectSection(SolutionItems) = preProject
+		Motoring\infra\dev\resources\container-app\motoring-subgraph.yaml = Motoring\infra\dev\resources\container-app\motoring-subgraph.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dev", "Dev", "{70A6BDED-5B11-4B0F-B38C-C63AC697E53A}"
+	ProjectSection(SolutionItems) = preProject
+		Person\infra\dev\resources\container-app\person-subgraph.yaml = Person\infra\dev\resources\container-app\person-subgraph.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sit", "Sit", "{F288AE3B-6300-41FD-94BB-104ADD75B8AC}"
+	ProjectSection(SolutionItems) = preProject
+		Membership\infra\sit\resources\container-app\membership-subgraph.yaml = Membership\infra\sit\resources\container-app\membership-subgraph.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sit", "Sit", "{509710FD-4934-4DB7-BD5E-F557DC310F17}"
+	ProjectSection(SolutionItems) = preProject
+		Motoring\infra\sit\resources\container-app\motoring-subgraph.yaml = Motoring\infra\sit\resources\container-app\motoring-subgraph.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sit", "Sit", "{B334257E-E539-4259-BC6D-398AB63A0D4F}"
+	ProjectSection(SolutionItems) = preProject
+		Person\infra\sit\resources\container-app\person-subgraph.yaml = Person\infra\sit\resources\container-app\person-subgraph.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "pipelines", "pipelines", "{73037D07-F7A3-4E82-9F4B-5EFC7407936D}"
+	ProjectSection(SolutionItems) = preProject
+		..\..\.github\workflows\ci_backend.yaml = ..\..\.github\workflows\ci_backend.yaml
+		..\..\.github\workflows\subgraph_insurance_release.yaml = ..\..\.github\workflows\subgraph_insurance_release.yaml
+		..\..\.github\workflows\subgraph_membership_release.yaml = ..\..\.github\workflows\subgraph_membership_release.yaml
+		..\..\.github\workflows\subgraph_motoring_release.yaml = ..\..\.github\workflows\subgraph_motoring_release.yaml
+		..\..\.github\workflows\subgraph_person_release.yaml = ..\..\.github\workflows\subgraph_person_release.yaml
+		..\..\.github\workflows\supergraph_gateway_release.yaml = ..\..\.github\workflows\supergraph_gateway_release.yaml
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Person.Integration.Tests", "tests\Person.Integration.Tests\Person.Integration.Tests.csproj", "{5B785F1E-6FC7-4ED8-A73B-0317A1620C97}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.Integration.Tests", "tests\Shared.Integration.Tests\Shared.Integration.Tests.csproj", "{FE47EDD6-7F81-412D-BFFD-D96937AA436E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Motoring.Integration.Tests", "tests\Motoring.Integration.Tests\Motoring.Integration.Tests.csproj", "{1BBB2411-6078-445A-9056-525EF30108B3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Membership.Integration.Tests", "tests\Membership.Integration.Tests\Membership.Integration.Tests.csproj", "{734FC891-06D8-4F93-98A5-DCD3ACD24C2A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9591501A-A5C2-415B-8C45-7B504553FE6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9591501A-A5C2-415B-8C45-7B504553FE6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9591501A-A5C2-415B-8C45-7B504553FE6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9591501A-A5C2-415B-8C45-7B504553FE6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A1547AB-DB55-47FD-8F15-F5E03A7E6720}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A1547AB-DB55-47FD-8F15-F5E03A7E6720}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A1547AB-DB55-47FD-8F15-F5E03A7E6720}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A1547AB-DB55-47FD-8F15-F5E03A7E6720}.Release|Any CPU.Build.0 = Release|Any CPU
+		{11508C15-603C-44B4-B354-B21D5B169B51}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{11508C15-603C-44B4-B354-B21D5B169B51}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{11508C15-603C-44B4-B354-B21D5B169B51}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{11508C15-603C-44B4-B354-B21D5B169B51}.Release|Any CPU.Build.0 = Release|Any CPU
+		{26071144-CEDE-45D0-8008-79CF4BCA517E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{26071144-CEDE-45D0-8008-79CF4BCA517E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{26071144-CEDE-45D0-8008-79CF4BCA517E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{26071144-CEDE-45D0-8008-79CF4BCA517E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4AE6F328-6ACD-4A85-B493-EF04442457DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4AE6F328-6ACD-4A85-B493-EF04442457DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4AE6F328-6ACD-4A85-B493-EF04442457DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4AE6F328-6ACD-4A85-B493-EF04442457DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DAAE6AC2-19B8-45AA-B212-A809C308ED80}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DAAE6AC2-19B8-45AA-B212-A809C308ED80}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DAAE6AC2-19B8-45AA-B212-A809C308ED80}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DAAE6AC2-19B8-45AA-B212-A809C308ED80}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7187D31F-3BD3-48F7-971D-07E4119E1048}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7187D31F-3BD3-48F7-971D-07E4119E1048}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7187D31F-3BD3-48F7-971D-07E4119E1048}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7187D31F-3BD3-48F7-971D-07E4119E1048}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D3143D18-A3E0-47FF-92A7-39DB23F67390}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D3143D18-A3E0-47FF-92A7-39DB23F67390}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D3143D18-A3E0-47FF-92A7-39DB23F67390}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D3143D18-A3E0-47FF-92A7-39DB23F67390}.Release|Any CPU.Build.0 = Release|Any CPU
+		{395BBE83-B41D-405F-B8FA-DC37A1093A6E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{395BBE83-B41D-405F-B8FA-DC37A1093A6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{395BBE83-B41D-405F-B8FA-DC37A1093A6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{395BBE83-B41D-405F-B8FA-DC37A1093A6E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3FE5BC18-5603-4F71-BE53-2D3320CE8C2E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3FE5BC18-5603-4F71-BE53-2D3320CE8C2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3FE5BC18-5603-4F71-BE53-2D3320CE8C2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3FE5BC18-5603-4F71-BE53-2D3320CE8C2E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5B785F1E-6FC7-4ED8-A73B-0317A1620C97}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B785F1E-6FC7-4ED8-A73B-0317A1620C97}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B785F1E-6FC7-4ED8-A73B-0317A1620C97}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B785F1E-6FC7-4ED8-A73B-0317A1620C97}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FE47EDD6-7F81-412D-BFFD-D96937AA436E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE47EDD6-7F81-412D-BFFD-D96937AA436E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE47EDD6-7F81-412D-BFFD-D96937AA436E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE47EDD6-7F81-412D-BFFD-D96937AA436E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1BBB2411-6078-445A-9056-525EF30108B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1BBB2411-6078-445A-9056-525EF30108B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1BBB2411-6078-445A-9056-525EF30108B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1BBB2411-6078-445A-9056-525EF30108B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{734FC891-06D8-4F93-98A5-DCD3ACD24C2A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{734FC891-06D8-4F93-98A5-DCD3ACD24C2A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{734FC891-06D8-4F93-98A5-DCD3ACD24C2A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{734FC891-06D8-4F93-98A5-DCD3ACD24C2A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{9591501A-A5C2-415B-8C45-7B504553FE6F} = {965A7FE7-C18E-40D7-A146-68F75AA0BC05}
+		{9A1547AB-DB55-47FD-8F15-F5E03A7E6720} = {965A7FE7-C18E-40D7-A146-68F75AA0BC05}
+		{11508C15-603C-44B4-B354-B21D5B169B51} = {424D2D7A-B525-419D-AACD-A8CF4F483CB4}
+		{26071144-CEDE-45D0-8008-79CF4BCA517E} = {965A7FE7-C18E-40D7-A146-68F75AA0BC05}
+		{4AE6F328-6ACD-4A85-B493-EF04442457DC} = {424D2D7A-B525-419D-AACD-A8CF4F483CB4}
+		{DAAE6AC2-19B8-45AA-B212-A809C308ED80} = {424D2D7A-B525-419D-AACD-A8CF4F483CB4}
+		{7187D31F-3BD3-48F7-971D-07E4119E1048} = {965A7FE7-C18E-40D7-A146-68F75AA0BC05}
+		{D3143D18-A3E0-47FF-92A7-39DB23F67390} = {424D2D7A-B525-419D-AACD-A8CF4F483CB4}
+		{395BBE83-B41D-405F-B8FA-DC37A1093A6E} = {965A7FE7-C18E-40D7-A146-68F75AA0BC05}
+		{3FE5BC18-5603-4F71-BE53-2D3320CE8C2E} = {424D2D7A-B525-419D-AACD-A8CF4F483CB4}
+		{CFBB5BB3-86C2-48E5-B9F0-3AC03E3A461B} = {235D819C-A4E1-4E4E-8EFB-8FCC7EAD66EB}
+		{CA0BB8A7-B9C9-43BB-AF3D-1CED22B5CC3A} = {CFBB5BB3-86C2-48E5-B9F0-3AC03E3A461B}
+		{47690E18-BDBC-4468-BB36-E80020DA277F} = {CFBB5BB3-86C2-48E5-B9F0-3AC03E3A461B}
+		{3B0DD25D-055F-4C59-B708-B9CA1A5D41B4} = {235D819C-A4E1-4E4E-8EFB-8FCC7EAD66EB}
+		{77589030-F667-459F-A1D1-3CC71C26AC1C} = {235D819C-A4E1-4E4E-8EFB-8FCC7EAD66EB}
+		{3D7A8FD7-72CF-46F0-9B80-90F909915A96} = {235D819C-A4E1-4E4E-8EFB-8FCC7EAD66EB}
+		{C5F5147D-0F74-421C-8E1A-1463539D9A87} = {3B0DD25D-055F-4C59-B708-B9CA1A5D41B4}
+		{6A4BB5E9-9F8C-41D9-902B-5469CB71B8C5} = {77589030-F667-459F-A1D1-3CC71C26AC1C}
+		{70A6BDED-5B11-4B0F-B38C-C63AC697E53A} = {3D7A8FD7-72CF-46F0-9B80-90F909915A96}
+		{F288AE3B-6300-41FD-94BB-104ADD75B8AC} = {3B0DD25D-055F-4C59-B708-B9CA1A5D41B4}
+		{509710FD-4934-4DB7-BD5E-F557DC310F17} = {77589030-F667-459F-A1D1-3CC71C26AC1C}
+		{B334257E-E539-4259-BC6D-398AB63A0D4F} = {3D7A8FD7-72CF-46F0-9B80-90F909915A96}
+		{5B785F1E-6FC7-4ED8-A73B-0317A1620C97} = {424D2D7A-B525-419D-AACD-A8CF4F483CB4}
+		{FE47EDD6-7F81-412D-BFFD-D96937AA436E} = {424D2D7A-B525-419D-AACD-A8CF4F483CB4}
+		{1BBB2411-6078-445A-9056-525EF30108B3} = {424D2D7A-B525-419D-AACD-A8CF4F483CB4}
+		{734FC891-06D8-4F93-98A5-DCD3ACD24C2A} = {424D2D7A-B525-419D-AACD-A8CF4F483CB4}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2BE21152-2F39-4C2B-8604-83D2E6747A16}
+	EndGlobalSection
+EndGlobal

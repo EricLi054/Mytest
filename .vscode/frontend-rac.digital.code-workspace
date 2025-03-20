@@ -1,0 +1,18 @@
+{
+  "folders": [
+    {
+      "path": "..",
+    },
+  ],
+  "settings": {
+    "files.exclude": {
+      "backend": true,
+      "coverage": true,
+      "infrastructure": true,
+      ".gitmodules": true,
+      ".github": true,
+      ".codacy.yaml": true,
+      "CODEOWNERS": true
+    },
+  },
+}

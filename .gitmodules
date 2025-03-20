@@ -1,3 +1,6 @@
 [submodule "infrastructure/modules/terraform-azure-app-gateway"]
 	path = infrastructure/modules/terraform-azure-app-gateway
 	url = https://github.com/racwa/terraform-azure-app-gateway.git
+[submodule "infrastructure/modules/terraform-azure-front-door"]
+	path = infrastructure/modules/terraform-azure-front-door
+	url = https://github.com/racwa/terraform-azure-front-door.git

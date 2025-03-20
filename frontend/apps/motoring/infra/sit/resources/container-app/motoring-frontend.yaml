@@ -1,0 +1,37 @@
+motoring-frontend:
+  properties:
+    configuration:
+      ingress:
+        customDomains:
+          - name: motoring-frontend-sit.ractest.com.au
+            certificateBindingType: SniEnabled
+            certificateName: ractest-wildcard-2024
+      registries:
+        - server: racwa.azurecr.io
+          username: ''
+          passwordSecretRef: ''
+          identity: /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe
+    template:
+      containers:
+        - image: racwa.azurecr.io/rac-digital/motoring-frontend
+          name: motoring-frontend
+          resources:
+            cpu: 0.25
+            memory: 0.5Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          env:
+            - name: CONTAINER_APP_ENV
+              value: 'sit'
+            # Next.JS v15 race condition with instrumentation and middleware.
+            # Current workaround is to load this individually until a permanent fix is found.
+            - name: AZURE_AD_B2C_CLIENT_SECRET
+              secretRef: azure-ad-b2c-client-secret
+      scale:
+        minReplicas: 2
+        maxReplicas: 2
+
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+      - /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe

@@ -1,0 +1,145 @@
+name: Deploy - Terraform Plan
+description: Creates a Terraform plan for upcoming container deployment
+
+inputs:
+  azure_client_id:
+    required: true
+    type: string
+  azure_tenant_id:
+    required: true
+    type: string
+  arm_subscription_id:
+    required: true
+    type: string
+  terraform_directory:
+    required: true
+    type: string
+  terraform_options:
+    required: true
+    type: string
+  terraform_backend_key:
+    required: true
+    type: string
+  is_pull_request:
+    required: true
+    type: boolean
+  upload_plan_azure_storage:
+    required: false
+    type: boolean
+    default: false
+  terraform_plan_file:
+    required: false
+    type: string
+    default: 'tf.plan'
+  deployment_name:
+    description: >
+      The name of the deployment, only current used in the blast radius calculation when commenting on pull requests.
+      If you have multiple Terraform deployments in a single workflow you should define this for each deployment,
+      otherwise you will only get the blast radius calculation for the last deployment in your workflow.
+    default: ''
+    required: false
+    type: string
+  show_blast_radius:
+    required: false
+    type: boolean
+    default: true
+
+outputs:
+  terraform_plan_filename:
+    description: 'The name of the terraform plan file that was uploaded to Azure Storage'
+    value: ${{ steps.upload_terraform_plan.outputs.plan_filename }}
+
+runs:
+  using: 'composite'
+
+  steps:
+    - name: 🦺 Setup Terraform
+      uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      with:
+        terraform_version: 'latest'
+
+    - name: 🐬 Terraform Init
+      shell: bash
+      run: |
+        terraform -chdir="${{ inputs.terraform_directory }}" init \
+          -backend-config="tenant_id=${{ inputs.azure_tenant_id }}" \
+          -backend-config="subscription_id=${{ env.TERRAFORM_BACKEND_SUBSCRIPTION_ID }}" \
+          -backend-config="resource_group_name=${{ env.TERRAFORM_BACKEND_RESOURCE_GROUP }}" \
+          -backend-config="storage_account_name=${{ env.TERRAFORM_BACKEND_STORAGE_ACCOUNT }}" \
+          -backend-config="container_name=${{ env.TERRAFORM_BACKEND_CONTAINER }}" \
+          -backend-config="key=${{ inputs.terraform_backend_key }}" \
+          -backend-config="use_azuread_auth=${{ env.USE_AZURE_AD_AUTH }}" \
+          -backend-config="use_oidc=${{ env.USE_FEDERATED_CREDENTIALS }}"
+      env:
+        TERRAFORM_BACKEND_SUBSCRIPTION_ID: '18ebc478-c4af-4365-a746-9026391a40da'
+        TERRAFORM_BACKEND_RESOURCE_GROUP: 'platform-terraform-state'
+        TERRAFORM_BACKEND_STORAGE_ACCOUNT: 'racwaplatformtfstate'
+        TERRAFORM_BACKEND_CONTAINER: 'react-monorepo'
+        USE_AZURE_AD_AUTH: true
+        USE_FEDERATED_CREDENTIALS: true
+
+    - name: 📗 Terraform Syntax Check
+      continue-on-error: false
+      shell: bash
+      run: terraform fmt -check -recursive '${{ inputs.terraform_directory }}'
+
+    - name: 🌊 Terraform Validation Check
+      continue-on-error: false
+      shell: bash
+      run: terraform -chdir='${{ inputs.terraform_directory }}' validate
+
+    - name: 💡 Terraform Plan
+      id: plan
+      shell: bash
+      run: |
+        terraform -chdir='${{ inputs.terraform_directory }}' \
+        plan ${{ inputs.terraform_options }} \
+        -out='${{ inputs.terraform_plan_file }}'
+
+    - name: 💹 Upload TF plan
+      id: upload_terraform_plan
+      if: ${{ inputs.is_pull_request == 'false' && inputs.upload_plan_azure_storage == 'true' }}
+      shell: bash
+      run: |
+        plan_filename="plan_$(uuidgen)"
+        echo "plan_filename=${plan_filename}" >> "$GITHUB_OUTPUT"
+        az storage blob upload --subscription ${{ env.TERRAFORM_BACKEND_SUBSCRIPTION_ID }} \
+        --account-name ${{ env.TERRAFORM_BACKEND_STORAGE_ACCOUNT  }} \
+        --auth-mode ${{ env.COMPARE_PLAN_AUTH_MODE }} \
+        -c ${{ env.TERRAFORM_BACKEND_CONTAINER }} \
+        -n $plan_filename \
+        -f ${{ inputs.terraform_directory }}/${{ env.TERRAFORM_PLAN_FILE }} \
+        --tags storage_management_policy=tf_save_plan_file \
+        --overwrite
+      env:
+        TERRAFORM_BACKEND_SUBSCRIPTION_ID: '18ebc478-c4af-4365-a746-9026391a40da'
+        TERRAFORM_BACKEND_STORAGE_ACCOUNT: 'racwaplatformtfstate'
+        TERRAFORM_BACKEND_CONTAINER: 'react-monorepo'
+        TERRAFORM_PLAN_FILE: 'tf.plan'
+        COMPARE_PLAN_AUTH_MODE: 'login'
+        GH_TOKEN: ${{ github.token }}
+
+    - name: 🐛 Run TFSec
+      if: ${{ inputs.is_pull_request == 'true' }}
+      uses: aquasecurity/tfsec-pr-commenter-action@7a44c5dcde5dfab737363e391800629e27b6376b # v1.3.1
+      with:
+        working_directory: ${{ inputs.terraform_directory }}
+        tfsec_args: '--ignore-hcl-errors'
+        github_token: ${{ env.GITHUB_TOKEN }}
+        soft_fail_commenter: true
+        tfsec_version: v1.28.10
+
+    - name: 💢 Blast Radius Calculation
+      if: ${{ inputs.show_blast_radius == 'true' }}
+      id: blast_radius_calculation_step
+      uses: racwa/blast-radius-calculation-action@9e0da847284c65052e1d5a86fa5ed21405942d14 # 1.8.3
+      with:
+        rego-file-location: '.github/workflows/terraform.rego'
+        terraform-plan-location: ${{ inputs.terraform_plan_file }}
+        gh-token: ${{ env.GITHUB_TOKEN }}
+        terraform-dir: ${{ inputs.terraform_directory }}
+        deployment-name: ${{ inputs.deployment_name }}
+        create-pull-request-review: 'false'
+        show-images: 'true'
+        only-show-image-above-threshold: 'true'
+        job-display-name: '${{ github.jobs[github.job].name }}'

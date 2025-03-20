@@ -1,0 +1,27 @@
+{
+  "extends": "@racwa/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "types": ["@testing-library/jest-dom"],
+    "plugins": [
+      { "name": "next" },
+      {
+        "name": "gql.tada/ts-plugin",
+        "schema": "../../packages/gql/schema.graphql",
+        "tadaOutputLocation": "../../packages/gql/graphql-env.d.ts"
+      }
+    ],
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
+    "module": "esnext"
+  },
+  "include": [
+    ".",
+    ".next/types/**/*.ts",
+    "./**/*.ts",
+    "./**/*.tsx",
+    "node_modules/@racwa/gql/graphql-env.d.ts"
+  ],
+  "exclude": [".next", "coverage", "playwright-report"]
+}

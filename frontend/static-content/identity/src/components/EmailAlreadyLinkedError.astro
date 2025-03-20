@@ -1,0 +1,38 @@
+---
+import ErrorCard from "./ErrorCard.astro";
+
+const myRacLogin = import.meta.env.PUBLIC_MYRAC_LOGIN_PAGE;
+---
+
+<ErrorCard
+  id="emailAlreadyLinkedError"
+  title="This email is already linked to an account"
+>
+  <ol>
+    <li>
+      <p>
+        You may have already created a login with this email. <a
+          href={myRacLogin}
+          style="textLink">Login here</a
+        >.
+      </p>
+    </li>
+    <li>
+      <p>
+        If this email is being used for someone else's login (such as a family
+        member), please try again using a different email.
+      </p>
+    </li>
+    <li>
+      <p>
+        Call us on <a href="tel:1300045617">1300 045 617</a>.
+      </p>
+    </li>
+  </ol>
+</ErrorCard>
+
+<style>
+  p {
+    font-size: 16px;
+  }
+</style>

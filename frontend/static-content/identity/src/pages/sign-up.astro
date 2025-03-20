@@ -1,0 +1,61 @@
+---
+import Adb2CContent from "../components/Adb2cContent.astro";
+import RacLogo from "../components/RacLogo.astro";
+import Layout from "../layouts/Layout.astro";
+import NotificationCard from "../components/NotificationCard.astro";
+import Adb2CEmailOtpUi from "../components/Adb2cEmailOtpUi.astro";
+import Adb2CPasswordUi from "../components/Adb2cPasswordUi.astro";
+import EmailAlreadyLinkedError from "../components/EmailAlreadyLinkedError.astro";
+import EmailDoesNotExistError from "../components/EmailDoesNotExistError.astro";
+---
+
+<Layout title="Choose your login email | myRAC registration">
+  <main>
+    <RacLogo />
+    <h1 id="pageTitle">Choose your login email</h1>
+    <div id="content-box">
+      <Adb2CContent />
+    </div>
+    <EmailDoesNotExistError />
+    <EmailAlreadyLinkedError />
+    <NotificationCard
+      id="alertCodeExpiry"
+      message="This code expires in five minutes. You may need to check your spam folder."
+    />
+    <Adb2CEmailOtpUi
+      enableEmailEditing
+      verificationControlId="emailVerificationControl"
+      emailPageTitle="Choose your login email"
+      emailTabTitle="Choose your login email | myRAC registration"
+      verifyEmailPageTitle="Verify your login email"
+      verifyEmailTabTitle="Verify your login email | myRAC registration"
+    />
+    <Adb2CPasswordUi
+      passwordPageTitle="Choose a password"
+      passwordTabTitle="Choose a password | myRAC registration"
+      passwordLabel="Password"
+      passwordContinueLabel="Create your account"
+    />
+  </main>
+
+  <script is:inline>
+    function getPageDetails() {
+      var title = document.title;
+      var url = "";
+
+      switch (title) {
+        case "Choose your login email | myRAC registration":
+          url = "/identify/register/email";
+          break;
+        case "Verify your login email | myRAC registration":
+          url = "/identify/register/verify-email";
+          break;
+        case "Choose a password | myRAC registration":
+          url = "/identify/register/password";
+          break;
+      }
+
+      return { url, title };
+    }
+  </script>
+</Layout>

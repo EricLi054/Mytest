@@ -1,4 +1,4 @@
-name: '💡 Daily Update Trivy Cache'
+name: '💡 Update Trivy Cache'
 
 on:
   schedule:
@@ -9,6 +9,62 @@ jobs:
   update-trivy-db:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Trivy Cache
-        uses: ./.github/actions/trivy-cache
+      - name: Setup oras
+        uses: oras-project/setup-oras@5c0b487ce3fe0ce3ab0d034e63669e426e294e4d # v1
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Download and extract the vulnerability DB
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/.cache/trivy/db
+          oras pull ghcr.io/aquasecurity/trivy-db:2
+          tar -xzf db.tar.gz -C $GITHUB_WORKSPACE/.cache/trivy/db
+          rm db.tar.gz
+
+      - name: Download and extract the Java DB
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/.cache/trivy/java-db
+          oras pull ghcr.io/aquasecurity/trivy-java-db:1
+          tar -xzf javadb.tar.gz -C $GITHUB_WORKSPACE/.cache/trivy/java-db
+          rm javadb.tar.gz
+
+      - name: Cache DBs
+        uses: actions/cache/save@d4323d4df104b026a6aa633fdb11d772146be0bf # v4
+        with:
+          path: ${{ github.workspace }}/.cache/trivy
+          key: cache-trivy-main-db
+
+      - name: Cache Trivy binary
+        id: trivy-binary-cache
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4
+        with:
+          path: ~/.trivy/bin
+          key: trivy-binary-v0.56.1-Linux-X64
+
+      - name: Install Trivy binary if cache is missing
+        if: steps.trivy-binary-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          mkdir -p ~/.trivy/bin
+          curl -L https://github.com/aquasecurity/trivy/releases/download/v0.56.1/trivy_0.56.1_Linux-64bit.tar.gz -o /tmp/trivy.tar.gz
+          tar -xzvf /tmp/trivy.tar.gz -C ~/.trivy/bin trivy
+          if [ -f ~/.trivy/bin/trivy ]; then
+            chmod +x ~/.trivy/bin/trivy
+          else
+            echo "Error: Trivy binary not found at ~/.trivy/bin/trivy" >&2
+            exit 0
+          fi
+          rm /tmp/trivy.tar.gz
+
+      - name: Add Trivy to PATH
+        shell: bash
+        run: echo "~/.trivy/bin" >> $GITHUB_PATH
+
+      - name: Check if Trivy Update was Successful
+        shell: bash
+        run: |
+          if grep -q "##[warning]Cache save failed." $GITHUB_WORKSPACE/build.log; then
+            exit 1
+          fi

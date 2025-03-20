@@ -1,0 +1,8 @@
+**/.gitignore
+**/*.generated.ts
+.next/
+coverage/
+node_modules/
+out/
+public/
+src/graphql-env.d.ts

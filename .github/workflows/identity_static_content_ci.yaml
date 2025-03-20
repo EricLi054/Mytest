@@ -1,0 +1,234 @@
+name: '🎨 Frontend: Identity Static Content'
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+    tags-ignore:
+      - '*'
+    paths:
+      - '.github/workflows/identity_static_content_ci.yaml'
+      - 'frontend/static-content/identity/**'
+      - 'frontend/packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - '.github/workflows/identity_static_content_ci.yaml'
+      - 'frontend/static-content/identity/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: '@racwa/identity-static-content'
+  GIT_TAG: 'Identity.Static.Content'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: 👩‍💻 Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🏷️ Git Tag
+        id: git-tag
+        uses: './.github/actions/create-git-tag'
+        with:
+          application: ${{ env.GIT_TAG }}
+          is_production: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🍑 Determine Version
+        id: version
+        shell: pwsh
+        run: |
+          $newVersion = "${{ steps.git-tag.outputs.version }}"
+
+          $isMain = if ($env:GITHUB_REF -eq 'refs/heads/main') { 'true' } else { 'false' }
+
+          $imageTag = "latest"
+
+          $githubEvent = "${{ github.event_name  }}"
+          if ($githubEvent -eq "pull_request" ) {
+            $branch = "${{ github.head_ref }}"
+            $isMain = $branch -eq "main" 
+          } else {
+            $branch = "${{ github.ref }}"
+            $isMain = $branch -eq "refs/heads/main" 
+          }
+
+          if ($isMain -eq $False) {
+            $imageTag = "preview"
+            $newVersion = "$($newVersion)-Preview"
+          }
+
+          Write-Host "Is Main: $($isMain)"
+          Write-Host "Image Tag: $($imageTag)"
+          Write-Host "Container Version: $($newVersion)"
+
+          "isMain=$($isMain)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "imageTag=$($imageTag)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "version=$($newVersion)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          # Note: Some bug happening, where it is exiting with code 1
+          exit 0;
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: 🔧 Build DEV
+        shell: bash
+        working-directory: ./frontend/static-content/identity
+        run: pnpm run build:dev
+
+      - name: 📦 Upload DEV Artifact
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        with:
+          name: identity-static-content-dev
+          path: ./frontend/static-content/identity/output-dev
+
+      - name: 🔧 Build SIT
+        shell: bash
+        working-directory: ./frontend/static-content/identity
+        run: pnpm run build:sit
+
+      - name: 📦 Upload SIT Artifact
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        with:
+          name: identity-static-content-sit
+          path: ./frontend/static-content/identity/output-sit
+
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: 🚨 Lint
+        run: pnpm lint:ci --filter=${{ env.APP_NAME }}
+
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: ✍ Format
+        run: pnpm format:ci --filter=${{ env.APP_NAME }}
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: 👮 Typecheck
+        run: pnpm typecheck --filter=${{ env.APP_NAME }}
+
+  dev_deploy:
+    name: Deploy to DEV
+    runs-on: ubuntu-latest
+    needs: build
+    environment: identity-dev
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: 🔽 Download artifact
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4
+        with:
+          name: identity-static-content-dev
+          path: ./artifact-output
+        env:
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🔼 Deploy to Storage Account
+        shell: bash
+        run: |
+          az storage blob upload-batch \
+          --auth-mode login \
+          --subscription digital-npe \
+          --account-name adb2cstaticcontdev \
+          --source ./artifact-output \
+          --destination dev \
+          --overwrite
+
+  sit_deploy:
+    name: Deploy to SIT
+    runs-on: ubuntu-latest
+    needs: build
+    environment: identity-sit
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: 🔽 Download artifact
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4
+        with:
+          name: identity-static-content-sit
+          path: ./artifact-output
+        env:
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🔼 Deploy to Storage Account
+        shell: bash
+        run: |
+          az storage blob upload-batch \
+          --auth-mode login \
+          --subscription digital-npe \
+          --account-name adb2cstaticcontsit \
+          --source ./artifact-output \
+          --destination sit \
+          --overwrite

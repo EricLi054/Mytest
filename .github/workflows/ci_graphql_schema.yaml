@@ -1,0 +1,31 @@
+name: '🛡️ GraphQL: Schema Inspector'
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/packages/gql/schema.graphql'
+
+jobs:
+  test:
+    name: Check Schema
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🔖 Check PR Labels
+        id: pr-labels
+        run: |
+          LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' || echo "")
+          echo "labels=$LABELS" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: 🔍 Check for changes in GraphQL Schema
+        uses: kamilkisiela/graphql-inspector@master
+        with:
+          schema: 'main:frontend/packages/gql/schema.graphql'
+          fail-on-breaking: ${{ !contains(steps.pr-labels.outputs.labels, 'safe-breaking-change') }}
+          approve-label: 'safe-breaking-change'

@@ -1,0 +1,17 @@
+export const componentTypes = {
+  TEXT_FIELD: "text-field",
+  WIZARD: "wizard",
+  PLAIN_TEXT: "plain-text",
+  ADDRESS_INPUT: "address-input",
+  BUTTON_SELECT: "button-select",
+  DIVIDER: "divider",
+  ERROR_ALERT: "error-alert",
+  INFO_ALERT: "info-alert",
+  FIXED_LABEL_PLAIN_TEXT: "fixed-label-plain-text",
+  REDIRECT_EDIT: "redirect-edit",
+  RICH_TEXT: "rich-text",
+  WIZARD_SUBMIT_BUTTON: "wizard-submit-button",
+  WIZARD_CANCEL_BUTTON: "wizard-cancel-button",
+  OTP_INPUT: "otp-input",
+  ENGINEERED_FORM: "engineered-form",
+};

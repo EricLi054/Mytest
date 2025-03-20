@@ -11,14 +11,18 @@ runs:
   steps:
     - uses: pnpm/action-setup@v4
       with:
-        version: 9
+        version: 10.6.2
 
-    - name: Use Node.js 18
-      uses: actions/setup-node@v3
+    - name: Use Node.js 20
+      uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4
       with:
-        node-version: 18
+        node-version: 20
         cache: 'pnpm'
-        cache-dependency-path: '${{ inputs.working_dir }}/pnpm-lock.yaml'
+        cache-dependency-path: './pnpm-lock.yaml'
+
+    - name: Set registry
+      shell: bash
+      run: pnpm config set registry https://racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/
 
     - name: Install dependencies
       shell: bash

@@ -1,0 +1,49 @@
+name: 'Setup and install'
+description: 'Common setup steps for Actions'
+
+inputs:
+  npm-token:
+    description: 'Private npm token'
+    required: true
+    default: ' '
+
+runs:
+  using: 'composite'
+
+  steps:
+    - name: 🥡 Set up .npmrc file
+      shell: bash
+      run: |
+        echo "//racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/:username=racwa
+        //racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/:_password=${{ inputs.npm-token }}
+        //racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/:username=racwa
+        //racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/:_password=${{ inputs.npm-token }}
+        @racwa:registry=https://racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/
+        always-auth=true" > ~/.npmrc
+
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10.6.2
+
+    - name: 🎈 Use Node.js 20
+      uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+        cache-dependency-path: './pnpm-lock.yaml'
+
+    - name: 🔆 Set registry
+      shell: bash
+      run: pnpm config set registry https://racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/
+
+    - name: 🧩 Install dependencies
+      shell: bash
+      run: pnpm install --prefer-offline
+
+    - name: Cache turbo build setup
+      uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4
+      with:
+        path: .turbo
+        key: ${{ runner.os }}-turbo-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-turbo-

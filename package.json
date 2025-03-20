@@ -1,0 +1,57 @@
+{
+  "name": "rac-digital",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "packageManager": "pnpm@10.6.2",
+  "scripts": {
+    "build": "turbo run build",
+    "clean": "git clean -xdf node_modules .turbo",
+    "clean:workspaces": "turbo run clean",
+    "dev": "set CONTAINER_APP_ENV=local && pnpm open-browser && turbo dev",
+    "open-browser": "start http://localhost:3000",
+    "format": "turbo run format --continue -- --cache --cache-location node_modules/.cache/.prettiercache",
+    "format:ci": "turbo run format --continue",
+    "format:fix": "turbo run format --continue -- --write --cache --cache-location node_modules/.cache/.prettiercache",
+    "lint": "turbo run lint --continue -- --cache --cache-location node_modules/.cache/.eslintcache",
+    "lint:ci": "turbo run lint --continue",
+    "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location node_modules/.cache/.eslintcache",
+    "lint:ws": "pnpm dlx sherif@1.4.0",
+    "storybook": "pnpm turbo run dev --filter=@racwa/storybook",
+    "storybook:ci": "pnpm turbo run storybook:ci --filter=@racwa/storybook",
+    "test-storybook": "test-storybook",
+    "storybook:test": "pnpm run test-storybook --config-dir ./frontend/apps/storybook/.storybook --failOnConsole",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "test:coverage:all": "vitest run --coverage",
+    "motoring:test:e2e": "pnpm --filter=@racwa/motoring exec playwright test tests.e2e.ts --project=chromium",
+    "test:e2e": "turbo run test:e2e",
+    "test:e2e:local": "set CONTAINER_APP_ENV=local && turbo run test:e2e:local",
+    "test:watch": "TURBO_UI=1 turbo run test:watch",
+    "typecheck": "turbo run typecheck",
+    "postinstall": "turbo telemetry disable && pnpm lint:ws",
+    "gateway": "powershell -File backend/run-supergraph-gateway.ps1"
+  },
+  "pnpm": {
+    "overrides": {
+      "graphql": "catalog:",
+      "vite": "catalog:"
+    }
+  },
+  "devDependencies": {
+    "@racwa/prettier-config": "workspace:*",
+    "@racwa/vitest-config": "workspace:*",
+    "@storybook/test-runner": "0.22.0",
+    "@turbo/gen": "2.4.4",
+    "@types/node": "catalog:node",
+    "@vitest/coverage-istanbul": "catalog:",
+    "playwright": "catalog:",
+    "prettier": "catalog:",
+    "turbo": "2.4.4",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "prettier": "@racwa/prettier-config"
+}

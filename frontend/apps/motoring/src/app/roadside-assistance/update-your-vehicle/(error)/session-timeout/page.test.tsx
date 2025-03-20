@@ -1,0 +1,64 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { clientEnv } from "#env/client";
+import { expectGtmCustomEvent } from "#testing/analytics";
+import { describe, expect, it, vi } from "vitest";
+
+import { deleteSessionCookie } from "../../session/actions";
+import SessionTimeout from "./page";
+
+vi.mock("../../session/actions.ts");
+vi.mock("server-only", () => ({}));
+
+const searchParams = { previousPage: undefined };
+
+describe("SessionTimeout", () => {
+  it("should be able to render", async () => {
+    render(await SessionTimeout({ searchParams: new Promise((resolve) => resolve(searchParams)) }));
+
+    const myRacLink = screen.getByRole("link", { name: /Back to myRAC/i });
+    const accessibilityLink = screen.getByRole("link", { name: /Accessibility/i });
+    const disclaimerLink = screen.getByRole("link", { name: /Disclaimer/i });
+    const privacyLink = screen.getByRole("link", { name: /Privacy/i });
+    const securityLink = screen.getByRole("link", { name: /Security/i });
+
+    expect(screen.getByText("Uh oh!")).toBeVisible();
+    expect(screen.getByText("It looks like your page timed out")).toBeVisible();
+    expect(screen.getByText("Please try again.")).toBeVisible();
+    expect(myRacLink).toBeVisible();
+    expect(myRacLink).toHaveAttribute("href", `${clientEnv().NEXT_PUBLIC_RAC_HOMEPAGE_URL}/myrac`);
+    expect(accessibilityLink).toHaveAttribute(
+      "href",
+      `${clientEnv().NEXT_PUBLIC_RAC_HOMEPAGE_URL}/about-rac/site-info/accessibility`,
+    );
+    expect(disclaimerLink).toHaveAttribute(
+      "href",
+      `${clientEnv().NEXT_PUBLIC_RAC_HOMEPAGE_URL}/about-rac/site-info/disclaimer`,
+    );
+    expect(privacyLink).toHaveAttribute(
+      "href",
+      `${clientEnv().NEXT_PUBLIC_RAC_HOMEPAGE_URL}/about-rac/site-info/privacy`,
+    );
+    expect(securityLink).toHaveAttribute(
+      "href",
+      `${clientEnv().NEXT_PUBLIC_RAC_HOMEPAGE_URL}/about-rac/site-info/security`,
+    );
+  });
+
+  it("should raise GTM event when 'Back to myRAC' button is clicked", async () => {
+    const user = userEvent.setup();
+    render(await SessionTimeout({ searchParams: new Promise((resolve) => resolve(searchParams)) }));
+
+    await user.click(screen.getByRole("link", { name: /Back to myRAC/i }));
+
+    expectGtmCustomEvent("Back to myRAC");
+  });
+
+  it("should call deleteSessionCookie", async () => {
+    vi.mocked(deleteSessionCookie);
+
+    render(await SessionTimeout({ searchParams: new Promise((resolve) => resolve(searchParams)) }));
+
+    await waitFor(() => expect(deleteSessionCookie).toHaveBeenCalled());
+  });
+});

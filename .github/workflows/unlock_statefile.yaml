@@ -1,0 +1,81 @@
+# Unlock a terraform statefile that is stuck. Usually happens if a tf plan is cancelled while in progress.
+
+name: '💡 Unlock Statefile'
+
+on:
+  workflow_dispatch:
+    inputs:
+      lock_id:
+        description: 'Lock ID of statefile to unlock. Get it from the failed workflow logs.'
+        required: true
+      lock_filename:
+        description: 'The filename of your lockfile (e.g. infrastructure_container_app_motoring_dev.tfstate)'
+        required: true
+      npe_or_prd:
+        type: choice
+        description: The container-app location of lockfile ran in (NPE or PRD)
+        options:
+          - npe
+          - prd
+        default: npe
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  unlock_statefile:
+    name: Unlock Statefile
+    runs-on: ubuntu-latest
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🦺 Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 'latest'
+
+      - name: 🐬 Terraform Init
+        shell: bash
+        run: |
+          terraform -chdir="infrastructure/container-app/${{ inputs.npe_or_prd }}" init \
+            -backend-config="tenant_id=${{ vars.AZURE_TENANT_ID }}" \
+            -backend-config="subscription_id=${{ env.TERRAFORM_BACKEND_SUBSCRIPTION_ID }}" \
+            -backend-config="resource_group_name=${{ env.TERRAFORM_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ env.TERRAFORM_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ env.TERRAFORM_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ inputs.lock_filename }}" \
+            -backend-config="use_azuread_auth=${{ env.USE_AZURE_AD_AUTH }}" \
+            -backend-config="use_oidc=${{ env.USE_FEDERATED_CREDENTIALS }}"
+        env:
+          TERRAFORM_BACKEND_SUBSCRIPTION_ID: '18ebc478-c4af-4365-a746-9026391a40da'
+          TERRAFORM_BACKEND_RESOURCE_GROUP: 'platform-terraform-state'
+          TERRAFORM_BACKEND_STORAGE_ACCOUNT: 'racwaplatformtfstate'
+          TERRAFORM_BACKEND_CONTAINER: 'react-monorepo'
+          USE_AZURE_AD_AUTH: true
+          USE_FEDERATED_CREDENTIALS: true
+
+      - name: 🐱‍👤 Force Unlock Statefile
+        shell: bash
+        run: |
+          terraform -chdir="infrastructure/container-app/${{ inputs.npe_or_prd }}" force-unlock -force ${{ inputs.lock_id }}

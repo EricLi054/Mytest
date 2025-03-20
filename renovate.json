@@ -1,0 +1,205 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "schedule": ["* 16-20 * * 0"],
+  "labels": ["dependencies"],
+  "osvVulnerabilityAlerts": false,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "groupName": "{{{vulnerabilitySeverity}}} vulnerable dependencies"
+  },
+  "npmrc": "//racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/:username=racwa\n//racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/:_password=${{ secrets.ADO_PACKAGES_RENOVATE_READ_ACCESS_BASE64 }}\n//racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/:username=racwa\n//racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/:_password=${{ secrets.ADO_PACKAGES_RENOVATE_READ_ACCESS_BASE64 }}\n@racwa:registry=https://racwa.pkgs.visualstudio.com/_packaging/racwa-design-feed/npm/registry/\nalways-auth=true",
+  "hostRules": [
+    {
+      "matchHost": "racwa.pkgs.visualstudio.com",
+      "token": "{{ secrets.ADO_PACKAGES_RENOVATE_READ_ACCESS }}"
+    },
+    {
+      "matchHost": "pkgs.dev.azure.com",
+      "token": "{{ secrets.ADO_PACKAGES_RENOVATE_READ_ACCESS }}"
+    }
+  ],
+  "nuget": {
+    "registryUrls": ["https://api.nuget.org/v3/index.json"]
+  },
+  "packageRules": [
+    {
+      "groupName": "npm non-major dependencies",
+      "groupSlug": "npm-minor-patch",
+      "labels": ["npm-non-major"],
+      "commitMessagePrefix": "Renovate (npm Dependencies):",
+      "matchPackageNames": ["!@types/jquery"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest",
+        "lockFileMaintenance",
+        "rollback",
+        "bump"
+      ],
+      "matchManagers": ["npm"],
+      "matchFileNames": [
+        ".node-version",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "backend/gateway/package.json",
+        "frontend/**/package.json",
+        "tooling/**/package.json"
+      ],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "npm major dependencies",
+      "groupSlug": "npm-major",
+      "labels": ["npm-major"],
+      "commitMessagePrefix": "Renovate (npm Dependencies):",
+      "matchPackageNames": ["!@types/jquery"],
+      "matchUpdateTypes": ["major"],
+      "matchManagers": ["npm"],
+      "matchFileNames": [
+        ".node-version",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "backend/gateway/package.json",
+        "frontend/**/package.json",
+        "tooling/**/package.json"
+      ],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "nuget non-major dependencies",
+      "groupSlug": "nuget-minor-patch",
+      "labels": ["nuget-non-major"],
+      "commitMessagePrefix": "Renovate (NuGet Dependencies):",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest",
+        "lockFileMaintenance",
+        "rollback",
+        "bump"
+      ],
+      "matchManagers": ["nuget"],
+      "matchFileNames": ["**/*.csproj"],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "nuget major dependencies",
+      "groupSlug": "nuget-major",
+      "labels": ["nuget-major"],
+      "commitMessagePrefix": "Renovate (NuGet Dependencies):",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": ["major"],
+      "matchManagers": ["nuget"],
+      "matchFileNames": ["**/*.csproj"],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "docker non-major dependencies",
+      "groupSlug": "docker-minor-patch",
+      "labels": ["docker-non-major"],
+      "commitMessagePrefix": "Renovate (Docker Dependencies):",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest",
+        "lockFileMaintenance",
+        "rollback",
+        "bump"
+      ],
+      "matchManagers": ["dockerfile"],
+      "matchFileNames": ["**/Dockerfile", "**/*.dockerfile"],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "docker major dependencies",
+      "groupSlug": "docker-major",
+      "labels": ["docker-major"],
+      "commitMessagePrefix": "Renovate (Docker Dependencies):",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": ["major"],
+      "matchManagers": ["dockerfile"],
+      "matchFileNames": ["**/Dockerfile", "**/*.dockerfile"],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "github-actions non-major dependencies",
+      "groupSlug": "github-actions-minor-patch",
+      "labels": ["github-actions-non-major"],
+      "commitMessagePrefix": "Renovate (GitHub Actions Dependencies):",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest",
+        "rollback",
+        "bump"
+      ],
+      "matchManagers": ["github-actions"],
+      "matchFileNames": [".github/**/*.yaml", ".github/**/*.yml"],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "github-actions major dependencies",
+      "groupSlug": "github-actions-major",
+      "labels": ["github-actions-major"],
+      "commitMessagePrefix": "Renovate (GitHub Actions Dependencies):",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": ["major"],
+      "matchManagers": ["github-actions"],
+      "matchFileNames": [".github/**/*.yaml", ".github/**/*.yml"],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "terraform non-major dependencies",
+      "groupSlug": "terraform-minor-patch",
+      "labels": ["terraform-non-major"],
+      "commitMessagePrefix": "Renovate (Terraform Dependencies):",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest",
+        "rollback",
+        "bump"
+      ],
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["**/*.tf"],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "terraform major dependencies",
+      "groupSlug": "terraform-major",
+      "labels": ["terraform-major"],
+      "commitMessagePrefix": "Renovate (Terraform Dependencies):",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": ["major"],
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["**/*.tf"],
+      "dependencyDashboardApproval": true,
+      "minimumReleaseAge": "7 days"
+    }
+  ]
+}

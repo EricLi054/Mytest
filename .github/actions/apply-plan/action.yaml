@@ -1,0 +1,110 @@
+name: Apply - Terraform Plan
+description: Applies an existing Terraform plan that has been uploaded to a storage account
+
+inputs:
+  azure_client_id:
+    required: true
+    type: string
+  azure_tenant_id:
+    required: true
+    type: string
+  arm_subscription_id:
+    required: true
+    type: string
+  terraform_directory:
+    required: true
+    type: string
+  terraform_options:
+    required: true
+    type: string
+  terraform_backend_key:
+    required: true
+    type: string
+  terraform_plan_filename:
+    required: true
+    type: string
+
+runs:
+  using: 'composite'
+
+  steps:
+    - name: 🦺 Setup Terraform
+      uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      with:
+        terraform_version: 'latest'
+
+    - name: 🐬 Terraform Init
+      shell: bash
+      run: |
+        terraform -chdir="${{ inputs.terraform_directory }}" init \
+          -backend-config="tenant_id=${{ inputs.azure_tenant_id }}" \
+          -backend-config="subscription_id=${{ env.TERRAFORM_BACKEND_SUBSCRIPTION_ID }}" \
+          -backend-config="resource_group_name=${{ env.TERRAFORM_BACKEND_RESOURCE_GROUP }}" \
+          -backend-config="storage_account_name=${{ env.TERRAFORM_BACKEND_STORAGE_ACCOUNT }}" \
+          -backend-config="container_name=${{ env.TERRAFORM_BACKEND_CONTAINER }}" \
+          -backend-config="key=${{ inputs.terraform_backend_key }}" \
+          -backend-config="use_azuread_auth=${{ env.USE_AZURE_AD_AUTH }}" \
+          -backend-config="use_oidc=${{ env.USE_FEDERATED_CREDENTIALS }}"
+      env:
+        TERRAFORM_BACKEND_SUBSCRIPTION_ID: '18ebc478-c4af-4365-a746-9026391a40da'
+        TERRAFORM_BACKEND_RESOURCE_GROUP: 'platform-terraform-state'
+        TERRAFORM_BACKEND_STORAGE_ACCOUNT: 'racwaplatformtfstate'
+        TERRAFORM_BACKEND_CONTAINER: 'react-monorepo'
+        USE_AZURE_AD_AUTH: true
+        USE_FEDERATED_CREDENTIALS: true
+
+    - name: 📗 Terraform Syntax Check
+      continue-on-error: false
+      shell: bash
+      run: terraform fmt -check -recursive '${{ inputs.terraform_directory }}'
+
+    - name: 🗿 Download Terraform Plan
+      shell: bash
+      run: |
+        plan_filename="${{ inputs.terraform_plan_filename }}"
+
+        # Ensure the terraform plan filename is not using blank guid
+        if [ ${#plan_filename} -lt 36 ]; then
+          echo "Invalid plan_filename"
+          exit 1
+        fi
+
+        az storage blob download --subscription ${{ env.TERRAFORM_BACKEND_SUBSCRIPTION_ID }} \
+        --account-name ${{ env.TERRAFORM_BACKEND_STORAGE_ACCOUNT }} \
+        --auth-mode ${{ env.COMPARE_PLAN_AUTH_MODE }} \
+        -c ${{ env.TERRAFORM_BACKEND_CONTAINER }} \
+        -n  ${{ inputs.terraform_plan_filename }} \
+        -f "${{ inputs.terraform_directory }}/${{ inputs.terraform_plan_filename }}" \
+        --overwrite \
+        --no-progress
+      env:
+        TERRAFORM_BACKEND_SUBSCRIPTION_ID: '18ebc478-c4af-4365-a746-9026391a40da'
+        TERRAFORM_BACKEND_STORAGE_ACCOUNT: 'racwaplatformtfstate'
+        TERRAFORM_BACKEND_CONTAINER: 'react-monorepo'
+        COMPARE_PLAN_AUTH_MODE: 'login'
+
+    - name: 🐙 Terraform Apply
+      shell: bash
+      run: |
+        terraform -chdir='${{ inputs.terraform_directory }}' show "${{ inputs.terraform_plan_filename }}"
+        terraform -chdir='${{ inputs.terraform_directory }}' apply ${{ inputs.terraform_options }} "${{ inputs.terraform_plan_filename }}"
+      env:
+        ARM_SUBSCRIPTION_ID: ${{ inputs.arm_subscription_id }}
+        ARM_CLIENT_ID: ${{ inputs.azure_client_id }}
+        ARM_TENANT_ID: ${{ inputs.azure_tenant_id }}
+
+    - name: 🧹 Clean Up Plan File
+      shell: bash
+      continue-on-error: true
+      run: |
+        echo "Delete plan file: ${{ inputs.terraform_plan_filename }}"
+        az storage blob delete --subscription ${{ env.TERRAFORM_BACKEND_SUBSCRIPTION_ID }} \
+        --account-name ${{ env.TERRAFORM_BACKEND_STORAGE_ACCOUNT }} \
+        --auth-mode ${{ env.COMPARE_PLAN_AUTH_MODE }} \
+        -c ${{ env.TERRAFORM_BACKEND_CONTAINER }} \
+        -n  ${{ inputs.terraform_plan_filename }}
+      env:
+        TERRAFORM_BACKEND_SUBSCRIPTION_ID: '18ebc478-c4af-4365-a746-9026391a40da'
+        TERRAFORM_BACKEND_STORAGE_ACCOUNT: 'racwaplatformtfstate'
+        TERRAFORM_BACKEND_CONTAINER: 'react-monorepo'
+        COMPARE_PLAN_AUTH_MODE: 'login'

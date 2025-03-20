@@ -1,0 +1,187 @@
+﻿schema @link(url: "https:\/\/specs.apollo.dev\/federation\/v2.6", import: [ "@tag", "@key", "FieldSet" ]) {
+  query: Query
+  mutation: Mutation
+}
+
+type Mutation {
+  updateRoadsideVehicle(productId: String! lineId: String! newVehicleDetail: VehicleDetailInput!): RoadsideProduct! @authorize @cost(weight: "10")
+}
+
+type Person @key(fields: "personId racId") {
+  personId: ID!
+  racId: ID!
+  roadsideProduct(id: String!): RoadsideProduct @cost(weight: "10")
+}
+
+type Query {
+  vehicleByRego(query: VehicleByRegoQueryInput!): VehicleDetail @authorize @cost(weight: "10")
+  _service: _Service!
+  _entities(representations: [_Any!]!): [_Entity]!
+}
+
+type RoadsideProduct @key(fields: "id custAccount") {
+  id: ID!
+  custAccount: ID!
+  isActive: Boolean!
+  lines: [RoadsideProductLine!]
+  line(id: String!): RoadsideProductLine
+}
+
+type RoadsideProductLine {
+  id: String!
+  version: Int!
+  productType: RoadsideProductType!
+  canUpdateVehicle: Boolean!
+  canUpdateVehicleReason: CanUpdateVehicleReason
+  vehicleDetail: VehicleDetail
+}
+
+type ServiceIsAlive @key(fields: "id") {
+  vehicleService: Boolean! @cost(weight: "10")
+  id: String!
+}
+
+type VehicleDetail {
+  vehicleType: VehicleType!
+  registrationNumber: String!
+  year: Int
+  make: String
+  model: String
+  vin: String
+  nvic: String
+  variant: String
+  series: String
+  body: String
+  color: String
+  engine: String
+  transmission: String
+  cylinder: String
+  cc: String
+  fuel: String
+  co2Emission: String
+  height: Float
+  length: Float
+  width: Float
+  kerbWeight: Float
+}
+
+"This type provides a field named sdl: String! which exposes the SDL of the service's schema. This SDL (schema definition language) is a printed version of the service's schema including the annotations of federation directives. This SDL does not include the additions of the federation spec."
+type _Service {
+  sdl: String!
+}
+
+"Union of all types that key directive applied. This information is needed by the Apollo federation gateway."
+union _Entity = Person | ServiceIsAlive | RoadsideProduct
+
+input VehicleByRegoQueryInput {
+  vehicleType: VehicleType!
+  registrationNumber: String!
+  state: State!
+}
+
+input VehicleDetailInput {
+  vehicleType: VehicleType!
+  registrationNumber: String!
+  year: Int
+  make: String
+  model: String
+  vin: String
+  nvic: String
+  variant: String
+  series: String
+  body: String
+  color: String
+  engine: String
+  transmission: String
+  cylinder: String
+  cc: String
+  fuel: String
+  co2Emission: String
+  height: Float
+  length: Float
+  width: Float
+  kerbWeight: Float
+}
+
+"Defines when a policy shall be executed."
+enum ApplyPolicy {
+  "Before the resolver was executed."
+  BEFORE_RESOLVER
+  "After the resolver was executed."
+  AFTER_RESOLVER
+  "The policy is applied in the validation step before the execution."
+  VALIDATION
+}
+
+enum CanUpdateVehicleReason {
+  VEHICLE_CHANGE_LIMIT_REACHED
+  REGO_ONLY_CHANGE_ALLOWED
+  PRODUCT_NOT_ENABLED
+}
+
+"Sourced from GET \/productholding\/v2\/products (CompanyId E098)."
+enum RoadsideProductType {
+  STANDARD
+  CLASSIC
+  ULTIMATE
+  ULTIMATE_PLUS
+  WHEELS2_GO
+  FREE2_GO_STANDARD
+  FREE2_GO_CLASSIC
+  FREE2_GO_ULTIMATE
+  FREE2_GO_ULTIMATE_PLUS
+  GOLD_LIFE_STANDARD
+  GOLD_LIFE_CLASSIC
+  GOLD_LIFE_ULTIMATE
+  GOLD_LIFE_ULTIMATE_PLUS
+  GOLD_LIFE_WHEELS2_GO
+  HONORARY_LIFE_STANDARD
+  HONORARY_LIFE_CLASSIC
+  HONORARY_STAFF_ULTIMATE
+  STAFF_ULTIMATE
+  COUNTRY_CONTRACTOR_ULTIMATE
+  FORD_NCO_REWARDS
+  FORD_DSR_REWARDS_NCO
+  FORD_CMO_STANDARD
+  FORD_DSR_STANDARD_MIGRATION_ONLY
+  MITSUBISHI_CMO_STANDARD
+  MITSUBISHI_DSR_STANDARD
+  SUBARU_CMO_STANDARD
+  SUBARU_MULTI_YEAR_CMO_STANDARD
+  ST_IVES
+  OTHER
+}
+
+enum State {
+  ACT
+  NSW
+  NT
+  QLD
+  SA
+  TAS
+  VIC
+  WA
+}
+
+enum VehicleType {
+  CAR
+  MOTORCYCLE
+}
+
+"The authorize directive."
+directive @authorize("The name of the authorization policy that determines access to the annotated resource." policy: String "Roles that are allowed to access the annotated resource." roles: [String!] "Defines when when the authorize directive shall be applied.By default the authorize directives are applied during the validation phase." apply: ApplyPolicy! = BEFORE_RESOLVER) repeatable on OBJECT | FIELD_DEFINITION
+
+"The purpose of the `cost` directive is to define a `weight` for GraphQL types, fields, and arguments. Static analysis can use these weights when calculating the overall cost of a query or response."
+directive @cost("The `weight` argument defines what value to add to the overall cost for every appearance, or possible appearance, of a type, field, argument, etc." weight: String!) on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | ENUM | INPUT_FIELD_DEFINITION
+
+"Used to indicate a combination of fields that can be used to uniquely identify and fetch an object or interface."
+directive @key(fields: FieldSet! resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
+
+"Links definitions within the document to external schemas."
+directive @link("Gets imported specification url." url: String! "Gets optional list of imported element names." import: [String!]) repeatable on SCHEMA
+
+"Scalar representing a set of fields."
+scalar FieldSet
+
+"The _Any scalar is used to pass representations of entities from external services into the root _entities field for execution. Validation of the _Any scalar is done by matching the __typename and @external fields defined in the schema."
+scalar _Any

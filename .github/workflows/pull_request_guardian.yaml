@@ -1,0 +1,115 @@
+name: '🕊️ Guardian of Main'
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  protect_main_from_evil:
+    name: Protection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check PR Statuses
+        id: version
+        shell: pwsh
+        run: |
+          $PullRequestNumber = "${{ github.event.pull_request.number }}"
+
+          # Wait to ensure all workflows for the pull request have started
+          # As it is possible this workflow will kick off before everything else has started
+          sleep 20
+
+          $MandatoryFrontendChecks = @("Build", "Test - Unit", "Test - Storybook", "Linting", "Format Check", "Type Check", "Find affected packages")
+          $MandatoryBackendChecks = @("Build Container Image")
+          $MandatoryInfraChecks = @()
+          $MandatoryMiscChecks = @()
+          $MandatoryChecks = $MandatoryFrontendChecks + $MandatoryBackendChecks + $MandatoryInfraChecks + $MandatoryMiscChecks
+
+          $CurrentStatuses = gh pr checks "$($PullRequestNumber)" --repo racwa/rac-digital --json name,state,workflow | ConvertFrom-Json
+
+          $MandatoryChecksForPR = $CurrentStatuses | Where-Object { $MandatoryChecks -contains $_.name }
+          $HasMandatoryCheck = $MandatoryChecksForPR | ForEach-Object { $True } | Select-Object -First 1
+
+          if ($MandatoryChecksForPR -ne $null) {
+            Write-Host "Required checks for this pull request are:"
+            $Count = 1;
+            foreach ($Check in $MandatoryChecksForPR) {
+              Write-Host "#$($Count): $($Check.name)"
+              $Count++
+            }
+            Write-Host "`n"
+          }
+
+          if ($HasMandatoryCheck -ne $True) {
+            Write-Host "[SUCCESS]: No mandatory checks for this PR"
+            exit 0
+          }
+
+          $CompletedChecks = $False
+
+          while ($CompletedChecks -eq $False) {
+
+            $FailedStatusChecks = $CurrentStatuses | Where-Object { $_.state -like "FAILURE" -and $MandatoryChecks -contains $_.name }
+            $HasFailedStatusCheck = $FailedStatusChecks | ForEach-Object { $True } | Select-Object -First 1
+
+            if ($HasFailedStatusCheck -eq $True) {
+              Write-Host "[FAILURE]: One or more mandatory status check FAILED."
+              Write-Host "[FAILURE]: Required checks for this pull request that have failed so far are:"
+              $Count = 1;
+              foreach ($Check in $FailedStatusChecks) {
+                Write-Host "[FAILURE]: #$($Count): Name: $($Check.name) State: $($Check.state)"
+                $Count++
+              }
+
+              exit -1
+            }
+
+            $SkippedStatusChecks = $CurrentStatuses | Where-Object { $_.state -like "SKIPPED" -and $MandatoryChecks -contains $_.name }
+            $HasSkippedStatusCheck = $SkippedStatusChecks | ForEach-Object { $True } | Select-Object -First 1
+
+            if ($HasSkippedStatusCheck -eq $True) {
+              Write-Host "[FAILURE]: One or more mandatory status check were SKIPPED."        
+              Write-Host "[FAILURE]: Required checks for this pull request that have been skipped are:"
+              $Count = 1;
+              foreach ($Check in $SkippedStatusChecks) {
+                Write-Host "[FAILURE]: #$($Count): Name: $($Check.name) State: $($Check.state)"
+                $Count++
+              }
+              Write-Host "`n"
+
+              exit -1
+            }
+
+            $InProgressStatusChecks =  $CurrentStatuses | Where-Object { $_.state -like "IN_PROGRESS" -and $MandatoryChecks -contains $_.name }
+            $HasInProgressStatusCheck = $InProgressStatusChecks | ForEach-Object { $True } | Select-Object -First 1
+
+            if ($HasInProgressStatusCheck -eq $True) {
+              Write-Host "[INFO]: Workflow still has in-progress mandatory status checks, it will check again in 15s"
+              Write-Host "[INFO]: Required checks that are still being waited for are:"
+              $Count = 1;
+              foreach ($Check in $InProgressStatusChecks) {
+                Write-Host "[INFO]: #$($Count): Name: $($Check.name) State: $($Check.state)"
+                $Count++
+              }
+              Write-Host "`n"
+
+              sleep 15
+
+              $CurrentStatuses = gh pr checks "$($PullRequestNumber)" --repo racwa/rac-digital --json name,state,workflow | ConvertFrom-Json
+            } else {
+              Write-Host "[SUCCESS]: Completed checking statuses"
+              $CompletedChecks = $True
+            }
+          }
+
+          Write-Host "[SUCCESS]: All mandatory checks passed"
+          exit 0

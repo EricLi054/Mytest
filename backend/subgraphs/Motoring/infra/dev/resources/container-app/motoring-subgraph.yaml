@@ -1,0 +1,32 @@
+motoring-subgraph:
+  properties:
+    configuration:
+      registries:
+        - server: racwa.azurecr.io
+          username: ''
+          passwordSecretRef: ''
+          identity: /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe
+    template:
+      containers:
+        - image: racwa.azurecr.io/rac-digital/motoring-subgraph
+          name: motoring-subgraph
+          resources:
+            cpu: 0.25
+            memory: 0.5Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          env:
+            - name: APIM__ApiKey
+              secretRef: digital-content-api-subscription-key
+            - name: AzureMonitor__ConnectionString
+              secretRef: app-insights-connection-string
+            - name: ASPNETCORE_ENVIRONMENT
+              value: dev
+      scale:
+        minReplicas: 2
+        maxReplicas: 2
+
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+      - /subscriptions/4b737f05-03e2-4b5a-88a4-aa8264a39bed/resourceGroups/rg-next-rac-com-au-npe/providers/Microsoft.ManagedIdentity/userAssignedIdentities/next-rac-identity-npe

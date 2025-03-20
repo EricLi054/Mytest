@@ -1,0 +1,34 @@
+{
+  "name": "@racwa/gql",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "clean": "git clean -xdf .turbo node_modules",
+    "compare:schema": "git fetch origin main && git show origin/main:frontend/packages/gql/schema.graphql > schema.main.graphql && graphql-inspector diff schema.main.graphql schema.graphql",
+    "format": "prettier --check . --ignore-path ../../../.gitignore",
+    "generate": "pnpm run generate:schema && pnpm run generate:types && pnpm run compare:schema",
+    "generate:schema": "pnpm gql-tada generate schema http://127.0.0.1:4000/graphql --output ./schema.graphql",
+    "generate:types": "pnpm gql-tada generate output",
+    "lint": "eslint",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@graphql-typed-document-node/core": "catalog:",
+    "graphql": "catalog:"
+  },
+  "devDependencies": {
+    "@graphql-inspector/cli": "5.0.8",
+    "@racwa/eslint-config": "workspace:*",
+    "@racwa/prettier-config": "workspace:*",
+    "@racwa/tsconfig": "workspace:*",
+    "eslint": "catalog:",
+    "gql.tada": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  },
+  "prettier": "@racwa/prettier-config"
+}

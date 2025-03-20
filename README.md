@@ -1,102 +1,195 @@
-# myRAC
+# RAC Digital Monorepo
 
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/7bc9b5d4365547b3b5e9df86aa788fe5)](https://app.codacy.com?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/174280b5ea15407eaf6a964a47451549)](https://app.codacy.com?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/174280b5ea15407eaf6a964a47451549)](https://app.codacy.com?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 
-> New experiences should be built in the [RAC Digial Repo](https://github.com/racwa/rac-digital)
+Current status for each frontend and backend pipeline within the Digital Platform.
 
-## Setting Up Development Environment
+| Application                 | Pipeline Status                                                                                                                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Codacy**                  | [![Codacy](https://github.com/racwa/rac-digital/actions/workflows/ci_codacy.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/ci_codacy.yaml)                                                      |
+| **Chromatic**               | [![Chromatic](https://github.com/racwa/rac-digital/actions/workflows/chromatic_release.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/chromatic_release.yaml)                                   |
+| **Trivy Cache**             | [![Trivy Cache](https://github.com/racwa/rac-digital/actions/workflows/trivy_cache.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/trivy_cache.yaml)                                             |
+| **Common**                  | [![Identity](https://github.com/racwa/rac-digital/actions/workflows/common_ci.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/common_ci.yaml)                                                    |
+| **Identity**                | [![Identity](https://github.com/racwa/rac-digital/actions/workflows/identity_ci.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/identity_ci.yaml)                                                |
+| **Identity Static Content** | [![Identity (Static Content)](https://github.com/racwa/rac-digital/actions/workflows/identity_static_content_ci.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/identity_static_content_ci.yaml) |
+| **Motoring**                | [![Motoring](https://github.com/racwa/rac-digital/actions/workflows/motoring_ci.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/motoring_ci.yaml)                                                |
+| **myRAC**                   | [![myRAC](https://github.com/racwa/rac-digital/actions/workflows/myrac_ci.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/myrac_ci.yaml)                                                         |
+| **Insurance Subgraph**      | [![Insurance Subgraph](https://github.com/racwa/rac-digital/actions/workflows/subgraph_insurance_release.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/subgraph_insurance_release.yaml)        |
+| **Membership Subgraph**     | [![Membership Subgraph](https://github.com/racwa/rac-digital/actions/workflows/subgraph_membership_release.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/subgraph_membership_release.yaml)     |
+| **Motoring Subgraph**       | [![Motoring Subgraph](https://github.com/racwa/rac-digital/actions/workflows/subgraph_motoring_release.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/subgraph_motoring_release.yaml)           |
+| **Person Subgraph**         | [![Person Subgraph](https://github.com/racwa/rac-digital/actions/workflows/subgraph_person_release.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/subgraph_person_release.yaml)                 |
+| **Supergraph Gateway**      | [![Supergraph Gateway](https://github.com/racwa/rac-digital/actions/workflows/supergraph_gateway_release.yaml/badge.svg?branch=main)](https://github.com/racwa/rac-digital/actions/workflows/supergraph_gateway_release.yaml)        |
 
-This repository uses Dapr for communication between components, as well as getting secrets and configuration.
+<br />
 
-### Recommended Extensions
+## Contents
 
-The follow extensions are recommended to be used with this codebase:
+- [Prerequisites](#prerequisites)
+  - [Read Confluence Documentation](#read-confluence-documentation)
+  - [Setup Local Githook](#setup-local-githook)
+- [Quick Start](#quick-start)
+  - [Domain Application](#domain-application)
+  - [Subgraph](#subgraph)
+  - [GraphQL Gateway](#graphQL-gateway)
+- [Packages Documentation](#quick-start)
+  - [Purpose of Packages](#purpose-of-packages)
+  - [Development and Maintenance Guidelines](#development-and-maintenance-guidelines)
+  - [Communication and Collaboration](#communication-and-collaboration)
+  - [Package Example](#package-example)
 
-- Prettier - Code formatter **_required_**
-- Testing _(optional)_
-  - C# Dev Kit
-  - Jest by Orta
-  - Playwright Test for VSCode
+<br />
 
-### Dapr
+# Prerequisites
 
-Steps to install Dapr can be found here: https://docs.dapr.io/getting-started/install-dapr-cli/
+> [!IMPORTANT]  
+> Before you begin development, please ensure you have completed all prerequisite activities first.
 
-1. To run the application as is connecting the components to Azure services, initialise dapr in slim mode:
+<br />
+
+### Read Confluence Documentation
+
+Read the Confluence documentation [here](https://rac-wa.atlassian.net/wiki/spaces/PDP/pages/3534389408/Building+Experiences) regarding how to build an experience.
+
+<br />
+
+### Setup Local Githook
+
+We utilise a githook to keep a reference to your piece of work on each commit you do.\
+It will prefix the commit message you create with the branch.
+
+| Commit Message | No Githook Installed | Githook Installed        |
+| -------------- | -------------------- | ------------------------ |
+| My cool change | My cool change       | DED-9999: My cool change |
+
+This helps with tracking git commit statistics in Jira, and helps discern what changes belong to what cards on a branch.\
+Worth noting that since we squash the commits when merging to main, so you should only be seeing what was used for the PR title when viewing the commit history of main.\
+But the githook can help when looking at old branches in pull requests that may have had other branches merged into it.
+
+You can install the githook [here](https://github.com/racwa/raci-dev-tools/tree/main/Environment%20Setup).
+
+<br />
+<br />
+
+# Quick Start
+
+### Domain Application
+
+The domain applications are the [Next.JS](https://nextjs.org/docs) applications which live under `frontend/apps/`.
+
+<br />
+
+**Setup Dependencies**
 
 ```bash
-dapr init --slim
-```
-
-2. We use a dedicated dapr config file to resolve dapr instance names via sqlite. To initialise sqlite, create a .dapr folder in the C:\Users\Public directory before running the tasks.json shortcut. The name resolution database will be created automatically and re-used on every application run.
-3. If you're using local dapr components like a Redis image or local keystore, you need to initialise dapr using Podman
-   - Follow the instructions on this page to initialise Dapr using the Podman runtime: https://docs.dapr.io/reference/cli/dapr-init/
-4. You will need to 'uninstall' dapr to switch between the two with
-
-```bash
-dapr uninstall --container-runtime podman
-```
-
-When Dapr is initialised it will created 3 containers, only 1 of them is required which is called dapr_placement. This container must be running anytime you want to run an application using Dapr.
-
-In your %userprofile%.dapr folder, there will be some default components and a config file. Delete the default components out of the folder and delete from line 5 of the config.yaml.
-
-After this, we need to create 2 components in the components folder which we will utilise for running our application, one for App Config and one for Keyvault, these can be found in the dapr-components folder.
-
-### PNPM
-
-The frontend application for this repo enforces using the pnpm package manager, install instructions can be found here: https://pnpm.io/installation
-
-After this, to install your dependecies
-
-```bash
+# Install dependencies
 pnpm i
 ```
 
-### Automated Linting
-
-A Git Hook has been created to automatically run code format checks on every git commit
-
-This is to prevent pipelines failing as they have in-built format protection in them
-
-To enable this locally, run
+**Development**
 
 ```bash
-git config --local core.hooksPath .githooks/
+# Start all development servers
+pnpm dev
+
+# Start specific development servers
+pnpm dev --filter=@racwa/motoring
 ```
 
-### Running the application
+**Adding a package**
 
-You will need to initally run a `az login` if you are connecting to Azure resources for the secrets and configuration.
-
-To run the application there is a vs code tasks which runs both the front and backend code. You can find this under the .vscode folder.
-
-In the vs code top menu, go to File > Preferences > Keyboard Shortcuts
-
-Click the Open Keyboard Shortcuts (JSON) button in the top right corner, and add the following JSON to setup a shortcut:
-
-```json
-[
-  {
-    "key": "ctrl+alt+d",
-    "command": "workbench.action.tasks.runTask",
-    "args": "Run Dapr"
-  }
-]
+```
+pnpm turbo gen package
 ```
 
-### How to run the project in Github Codespaces
+<br />
 
-1. Create a new codespace
+### Subgraph
 
-   1. From GitHub/browser in this repo either from https://github.com/racwa/next-rac-com-au/ itself, under \`<> Code\`\` button
+The subgraphs are .NET APIs which live under `backend/subgraphs/`.
 
-   2. From VS Code
+View README [here](https://github.com/racwa/rac-digital/blob/main/backend/subgraphs/README.md) for setup and configuration instructions.
 
-      1. Install GitHub Codespaces extension
+<br />
 
-      2. Ctrl-Shift-P and choose "Codespaces: Create New Codespace..." or "Connect to Codespace"
+### GraphQL Gateway
 
-2. In Terminal, run az login with the right AD credentials that has access to the azure app configuration resource
+The GraphQL gateway is located under `backend/gateway/`.
 
-3. Follow [frontend setup instructions for codespaces](./frontend/README.md/#codespaces)
+View README [here](https://github.com/racwa/rac-digital/blob/main/backend/gateway/README.md) for setup and configuration instructions.
+
+<br />
+<br />
+
+# Packages Documentation
+
+### Purpose of Packages
+
+This monorepo includes a set of packages designed for internal use only. Each package follows these core principles:
+
+1. **Built by the application using it:**
+   Packages are built as part of the consuming application, avoiding the overhead of managing separate builders or bundlers.
+
+2. **Internal-Only Scope:**
+   Packages are exclusively available within this monorepo. They are not versioned or published externally, simplifying management and development.
+
+3. **Single Responsibility Principle:**
+   Each package is designed with a specific purpose. It's preferred to create multiple focused packages rather than a single package attempting to handle too much functionality.
+
+4. **Comprehensive Documentation:**
+   Every package includes detailed documentation that describes:
+   - The purpose of the package.
+   - Instructions for using the package, with examples if applicable.
+
+<br />
+
+### Development and Maintenance Guidelines
+
+- **Testing:**
+  All packages must include automated tests to ensure reliability. Tests should cover primary use cases and edge cases as appropriate.
+
+- **Dependency Management:**
+  Avoid unnecessary external dependencies. Use shared dependencies within the monorepo consistently to reduce redundancy.
+
+- **Coding Standards:**
+  Packages must adhere to shared coding conventions, including linting (ESLint) and formatting (Prettier). Ensure code is clean and maintainable.
+
+- **Ownership:**
+  All teams are responsible for its maintenance, including addressing bugs, adding features, and keeping documentation up-to-date.
+
+- **Breaking Changes:**
+  When introducing changes that may break existing functionality, coordinate updates across all dependent packages and applications within the monorepo.
+
+<br />
+
+### Communication and Collaboration
+
+Packages should interact with each other using clearly defined contracts (e.g., TypeScript interfaces or APIs). Inter-package dependencies must be explicitly declared and managed to avoid unexpected behaviour.
+
+<br />
+
+### Package Example
+
+Below is a template for documenting each package:
+
+```markdown
+# Package Name
+
+## Purpose
+
+Briefly describe the purpose of this package.
+
+## Usage
+
+### Installation
+
+Provide instructions if applicable.
+
+### Examples
+
+Include code snippets showing common usage patterns.
+
+## Notes
+
+Any additional context, limitations, or important information.
+```

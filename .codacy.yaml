@@ -1,5 +1,23 @@
 ---
 exclude_paths:
-  - "**/README.md"
-  - "content-scripts/**"
-  - "frontend/next.config.js"
+  - '**.gitignore'
+  - '**/.dockerignore'
+  - '**.gitattributes'
+  - '**.editorconfig'
+  - '**.codacy.yaml'
+  - '**.md'
+  - '.storybook/**'
+  - '.vscode/**'
+  - 'docs/**'
+  - '**/*.stories.tsx'
+  - '**/styles.ts'
+  - '*.json'
+  - '.github/**'
+  - '**/types.ts'
+  - '**/*.test.tsx'
+  - '**/*.e2e.tsx'
+  - '**/storybook/**'
+  - '**/tooling/**'
+  - '**/turbo/**'
+  - 'tests/**'
+  - '**/Properties/AssemblyInfo.cs'

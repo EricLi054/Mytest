@@ -1,0 +1,103 @@
+name: Run Playwright Tests
+description: Runs Playwright tests
+
+inputs:
+  azure_client_id:
+    type: string
+    required: true
+  azure_tenant_id:
+    type: string
+    required: true
+  azure_subscription_id:
+    type: string
+    required: true
+  npm_token:
+    type: string
+    required: true
+  application_name:
+    type: string
+    required: true
+  playwright_working_directory:
+    type: string
+    required: true
+  environment:
+    type: string
+    required: true
+
+runs:
+  using: 'composite'
+
+  steps:
+    - name: 📚 Environment Variable - Manipulate
+      shell: bash
+      run: |
+        environmentLower=$(echo "${{ inputs.environment }}" | tr '[:upper:]' '[:lower:]')
+        environmentUpper=$(echo "${{ inputs.environment }}" | tr '[:lower:]' '[:upper:]')
+
+        echo "environment_lower=$environmentLower" >> $GITHUB_ENV
+        echo "environment_upper=$environmentUpper" >> $GITHUB_ENV
+
+    - name: 📄 Create requirements.txt
+      shell: bash
+      run: |
+        echo "azure-cli==2.67.0" > requirements.txt
+
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      with:
+        python-version: '3.x'
+
+    - name: 📦 Cache pip
+      uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: 🌋 Install Azure CLI
+      shell: bash
+      run: python3 -m pip install -r requirements.txt --disable-pip-version-check
+
+    - name: 🎤 Log in to Azure
+      uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+      with:
+        client-id: ${{ inputs.azure_client_id }}
+        tenant-id: ${{ inputs.azure_tenant_id }}
+        subscription-id: ${{ inputs.azure_subscription_id }}
+        allow-no-subscriptions: true
+
+    - name: 🦺 Setup
+      uses: ./.github/actions/setup
+      with:
+        npm-token: ${{ inputs.npm_token }}
+
+    - name: 🧪 Test
+      shell: bash
+      run: |
+        pnpm test:e2e --filter=${{ inputs.application_name }} --force
+      env:
+        CONTAINER_APP_ENV: '${{ env.environment_lower }}'
+
+    - name: ☀️ Get Artifact Retention Days
+      shell: bash
+      run: |
+        case "${{ inputs.environment }}" in
+          dev) retention_days=1 ;;
+          sit) retention_days=3 ;;
+          uat) retention_days=14 ;;
+          prd) retention_days=90 ;;
+          *) echo "Unknown environment: ${{ inputs.environment }}" && exit 1 ;;
+        esac
+        echo "retention-days=$retention_days" >> $GITHUB_ENV
+
+    - name: 📤 Upload Test Artifacts
+      if: always()
+      uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+      with:
+        name: 'Playwright Test Artifacts - ${{ env.environment_upper }} (Attempt ${{ github.run_attempt }})'
+        path: |
+          ${{ inputs.playwright_working_directory }}/playwright-screenshots
+          ${{ inputs.playwright_working_directory }}/playwright-report
+        if-no-files-found: error
+        retention-days: ${{ env.retention-days }}

@@ -1,0 +1,77 @@
+person-subgraph:
+  resourceGroupName: rg-next-rac-com-au-${{ env }}
+  managedEnvironmentName: next-rac-env-${{ env }}
+  keyVaultName: next-rac-vault-${{ env }}
+  appConfigName: next-rac-appconfig-${{ env }}
+  appInsightsName: next-rac-app-insights-${{ env }}
+  tags: {}
+  properties:
+    workloadProfileName: Consumption
+    configuration:
+      secrets:
+        - name: digital-content-api-subscription-key
+          valueFrom: keyvault
+      environmentVariables: []
+      activeRevisionsMode: Single
+      ingress:
+        external: false
+        targetPort: 8080
+        traffic:
+          - weight: 100
+            latestRevision: true
+        customDomains: []
+        ipSecurityRestrictions: []
+      dapr:
+        enabled: false
+        appId: backend
+        appProtocol: http
+        appPort: 3000
+    template:
+      revisionSuffix: ''
+      terminationGracePeriodSeconds:
+      containers:
+        - image: racwa.azurecr.io/rac-digital/person-subgraph
+          name: person-subgraph
+          env: []
+          resources:
+            cpu: 1
+            memory: 2Gi
+            ephemeralStorage: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          probes:
+            - type: Liveness
+              failureThreshold: 10
+              httpGet:
+                path: /health/liveness
+                port: 8080
+                scheme: HTTP
+              initialDelaySeconds: 3
+              periodSeconds: 10
+              timeoutSeconds: 1
+            - type: Readiness
+              failureThreshold: 10
+              httpGet:
+                path: /health/readiness
+                port: 8080
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 3
+              timeoutSeconds: 3
+            - type: Startup
+              failureThreshold: 3
+              httpGet:
+                path: /health/liveness
+                port: 8080
+                scheme: HTTP
+              periodSeconds: 10
+              timeoutSeconds: 1
+      initContainers:
+      scale:
+        minReplicas: 0
+        maxReplicas: 1
+        rules:
+          - name: http-scaler
+            http:
+              metadata:
+                concurrentRequests: 100

@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HotChocolate.ApolloFederation" Version="15.0.3" />
+    <PackageReference Include="HotChocolate.AspNetCore" Version="15.0.3" />
+    <PackageReference Include="HotChocolate.AspNetCore.Authorization" Version="15.0.3" />
+    <PackageReference Include="HotChocolate.Diagnostics" Version="15.0.3" />
+    <PackageReference Include="HotChocolate.Types.Analyzers" Version="15.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="8.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.2" />
+    <PackageReference Include="Microsoft.FeatureManagement" Version="4.0.0" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="3.8.0" />
+  </ItemGroup>
+
+</Project>

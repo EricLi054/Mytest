@@ -1,0 +1,299 @@
+name: '🏗️ Infra: Reverse Proxy (NPE)'
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+    tags-ignore:
+      - '*'
+    paths:
+      - '.github/workflows/ci_reverse_proxy.yaml'
+      - 'infrastructure/modules/container-app/**'
+      - 'infrastructure/reverse-proxy/**'
+  pull_request:
+    paths:
+      - '.github/workflows/ci_reverse_proxy.yaml'
+      - 'infrastructure/modules/container-app/**'
+      - 'infrastructure/reverse-proxy/**'
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_NAME: reverse-proxy
+  PROJECT_FOLDER: infrastructure/reverse-proxy/src/reverse-proxy
+  GIT_TAG: 'Reverse.Proxy'
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      isMain: ${{ steps.version.outputs.isMain }}
+      isPullRequest: ${{ steps.version.outputs.isPullRequest }}
+    steps:
+      - name: 👩‍💻 Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🦺 Setup .NET ${{ env.DOTNET_VERSION }} Environment
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.ADO_ARTIFACT_READ_ACCESS }}
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: ${{ env.PROJECT_FOLDER }}/packages.lock.json
+          source-url: https://pkgs.dev.azure.com/racwa/_packaging/RACI_Integration_Feed/nuget/v3/index.json
+
+      - name: 🍻 Install Dependencies
+        shell: bash
+        run: dotnet restore ${{ env.PROJECT_FOLDER }} --locked-mode
+
+      - name: 🏗️ Build project
+        run: dotnet build --no-restore ${{ env.PROJECT_FOLDER }}/reverse-proxy.csproj --configuration Release
+
+      - name: 🏷️ Git Tag
+        id: git-tag
+        uses: './.github/actions/create-git-tag'
+        with:
+          application: ${{ env.GIT_TAG }}
+          is_production: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🍑 Determine Version
+        id: version
+        shell: pwsh
+        run: |
+          $newVersion = "${{ steps.git-tag.outputs.version }}"
+
+          $isMain = if ($env:GITHUB_REF -eq 'refs/heads/main') { 'true' } else { 'false' }
+
+          $imageTag = "latest"
+          $isPullRequest = $false
+
+          $githubEvent = "${{ github.event_name  }}"
+          if ($githubEvent -eq "pull_request" ) {
+            $branch = "${{ github.head_ref }}"
+            $isMain = $branch -eq "main"
+            $isPullRequest = $True
+          } else {
+            $branch = "${{ github.ref }}"
+            $isMain = $branch -eq "refs/heads/main"
+          }
+
+          if ($isMain -eq $False) {
+            $imageTag = "preview"
+            $newVersion = "$($newVersion)-Preview-${{ github.run_number }}"
+          }
+
+          Write-Host "Is Main: $($isMain)"
+          Write-Host "Is Pull Request: $($isPullRequest)"
+          Write-Host "Image Tag: $($imageTag)"
+          Write-Host "Container Version: $($newVersion)"
+
+          "isMain=$($isMain)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "isPullRequest=$($isPullRequest)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "imageTag=$($imageTag)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "version=$($newVersion)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          # Note: Some bug happening, where it is exiting with code 1
+          exit 0;
+
+  build_reverse_proxy_container:
+    name: 🏗️ Build Container Image
+    runs-on: ubuntu-latest
+    needs: [build]
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout Codebase
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Azure Login Federated Creds
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🎪 Build and Push Container Image
+        uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.CONTAINER_REGISTRY_LOGIN_SERVER }}
+          acr_keyvault_name: ${{ env.ACR_KEYVAULT_NAME }}
+          acr_token_secret_name: ${{ env.ACR_TOKEN_SECRET_NAME }}
+          image_name: ${{ env.CONTAINER_REGISTRY_PATH }}/${{ env.IMAGE_NAME }}
+          image_tag: 'preview'
+          version_tag: ${{ needs.build.outputs.version }}
+          docker_context: ./${{ env.PROJECT_FOLDER }}
+          dockerfile_path: ./${{ env.PROJECT_FOLDER }}/Dockerfile
+          azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+        env:
+          CONTAINER_REGISTRY_LOGIN_SERVER: racwa.azurecr.io
+          CONTAINER_REGISTRY_PATH: rac-digital
+          IMAGE_NAME: reverse-proxy
+          ACR_KEYVAULT_NAME: acr-racwa
+          ACR_TOKEN_SECRET_NAME: rac-digital-write-access
+
+  dev_deploy_reverse_proxy:
+    name: Deploy to DEV
+    runs-on: digital-npe-ubuntu-latest
+    needs: [build, build_reverse_proxy_container]
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      actions: read
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -var="image_version=${{ needs.build.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../reverse-proxy/infra/templates/resources/container-app/reverse-proxy-template.yaml"
+            -var="container_apps_folder=../../reverse-proxy/infra/dev/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_${{ env.PROJECT_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: ${{ needs.build.outputs.isPullRequest }}
+          terraform_plan_file: 'tfdev.plan'
+          deployment_name: 'DEV'
+          show_images: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: dev
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: 🐙 Terraform Apply
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tfdev.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tfdev.plan'
+
+  sit_deploy_reverse_proxy:
+    name: ${{ needs.build.outputs.isMain == 'true' && 'Deploy to SIT' || 'Plan for SIT' }}
+    runs-on: digital-npe-ubuntu-latest
+    needs: [build, build_reverse_proxy_container]
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      actions: read
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -var="image_version=${{ needs.build.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../reverse-proxy/infra/templates/resources/container-app/reverse-proxy-template.yaml"
+            -var="container_apps_folder=../../reverse-proxy/infra/sit/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_backend_${{ env.PROJECT_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: ${{ needs.build.outputs.isPullRequest }}
+          terraform_plan_file: 'tfsit.plan'
+          deployment_name: 'SIT'
+          show_images: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: sit
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+
+      - name: 🐙 Terraform Apply
+        if: needs.build.outputs.isMain == 'true'
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tfsit.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        if: needs.build.outputs.isMain == 'true'
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tfsit.plan'

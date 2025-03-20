@@ -1,0 +1,51 @@
+---
+// ErrorCard
+
+// A RacwaNotificationCard error component that is hidden by default.
+
+import triangleExclamation from "../../public/icons/triangle-exclamation.svg";
+
+interface Props {
+  id: string;
+  title: string;
+}
+
+const { id, title } = Astro.props as Props;
+---
+
+<div class="errorBox" id={id} style="display: none;">
+  <div style="display: flex;">
+    <img src=`${triangleExclamation.src}` />
+    <p class="errorBoxTitle">{title}</p>
+  </div>
+  <div class="errorBoxContent">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .errorBox {
+    width: 100%;
+    box-sizing: border-box;
+    border-width: 1px 1px 1px 8px;
+    border-style: solid;
+    border-color: #a94442;
+    border-radius: 3px;
+    background-color: white;
+    margin: 16px 0px;
+    padding: 16px 16px 16px 24px;
+  }
+
+  img {
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
+  }
+
+  .errorBoxTitle {
+    flex-grow: 1;
+    font-size: 18px;
+    font-weight: 400;
+    color: #a94442;
+  }
+</style>

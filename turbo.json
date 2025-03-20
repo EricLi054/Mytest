@@ -1,0 +1,66 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["node_modules/.cache/tsbuildinfo.json", "dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "format": {
+      "outputs": ["node_modules/.cache/.prettiercache"],
+      "outputLogs": "new-only"
+    },
+    "lint": {
+      "outputs": ["node_modules/.cache/.eslintcache"]
+    },
+    "storybook:ci": {},
+    "test": {},
+    "test:coverage": {},
+    "test:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "test:e2e": {
+      "env": ["PLAYWRIGHT_BROWSERS_PATH"]
+    },
+    "test:e2e:local": {
+      "dependsOn": ["^build"],
+      "env": ["PLAYWRIGHT_BROWSERS_PATH"],
+      "cache": false
+    },
+    "typecheck": {
+      "outputs": ["node_modules/.cache/tsbuildinfo.json"]
+    },
+    "clean": {
+      "cache": false
+    }
+  },
+  "globalEnv": [
+    "APPLICATIONINSIGHTS_CONNECTION_STRING",
+    "AZURE_AD_B2C_CLIENT_ID",
+    "AZURE_AD_B2C_CLIENT_SECRET",
+    "AZURE_AD_B2C_CUSTOM_URL",
+    "AZURE_AD_B2C_EMAIL_UPDATE_FLOW",
+    "AZURE_AD_B2C_JWKS_URL",
+    "AZURE_AD_B2C_PASSWORD_UPDATE_FLOW",
+    "AZURE_AD_B2C_PRIMARY_USER_FLOW",
+    "AZURE_AD_B2C_TENANT_ID",
+    "CONTAINER_APP_ENV",
+    "CONTENTFUL_API_KEY",
+    "ENABLE_SUPERGRAPH_DEBUG_LOGGING",
+    "KEY_VAULT_NAME",
+    "KEY_VAULT_URL",
+    "NEXTAUTH_URL",
+    "PORT"
+  ],
+  "globalPassThroughEnv": [
+    "NEXT_RUNTIME",
+    "NODE_ENV",
+    "CI",
+    "npm_lifecycle_event",
+    "HOMEPATH"
+  ]
+}

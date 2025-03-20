@@ -1,0 +1,719 @@
+name: '🎨 Frontend: myRAC'
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+    tags-ignore:
+      - '*'
+    paths:
+      - '.github/workflows/myrac_ci.yaml'
+      - 'infrastructure/modules/container-app/**'
+      - 'frontend/apps/myrac/**'
+      - 'frontend/packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - '.github/workflows/myrac_ci.yaml'
+      - 'frontend/apps/myrac/**'
+      - 'frontend/packages/gql/schema.graphql'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: '@racwa/myrac'
+  GIT_TAG: 'MyRAC'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    environment: npe
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_main: ${{ steps.version.outputs.isMain }}
+      release-notes: ${{ steps.release-notes.outputs.release-notes }}
+
+    permissions:      
+      id-token: write
+      contents: write
+
+    steps:
+      - name: 👩‍💻 Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 🏷️ Git Tag
+        id: git-tag
+        uses: './.github/actions/create-git-tag'
+        with:
+          application: ${{ env.GIT_TAG }}
+          is_production: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🍑 Determine Version
+        id: version
+        shell: pwsh
+        run: |
+          $newVersion = "${{ steps.git-tag.outputs.version }}"
+
+          $isMain = if ($env:GITHUB_REF -eq 'refs/heads/main') { 'true' } else { 'false' }
+
+          $imageTag = "latest"
+
+          $githubEvent = "${{ github.event_name  }}"
+          if ($githubEvent -eq "pull_request" ) {
+            $branch = "${{ github.head_ref }}"
+            $isMain = $branch -eq "main"
+          } else {
+            $branch = "${{ github.ref }}"
+            $isMain = $branch -eq "refs/heads/main"
+          }
+
+          if ($isMain -eq $False) {
+            $imageTag = "preview"
+            $newVersion = "$($newVersion)-Preview"
+          }
+
+          Write-Host "Is Main: $($isMain)"
+          Write-Host "Image Tag: $($imageTag)"
+          Write-Host "Container Version: $($newVersion)"
+
+          "isMain=$($isMain)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "imageTag=$($imageTag)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "version=$($newVersion)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          # Note: Some bug happening, where it is exiting with code 1
+          exit 0;
+
+      - name: 📝 Create Release Notes
+        id: release-notes
+        uses: './.github/actions/release-notes'
+        with:
+          application_name: ${{ env.GIT_TAG }}
+          git_tag_name: ${{ env.GIT_TAG }}
+          application_directory: 'frontend/apps/myrac'
+          shared_resources: 'package.json,pnpm-lock.yaml,frontend/packages,infrastructure/modules/container-app'
+          version: ${{ steps.version.outputs.version }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🎪 Build and Push Container Image
+        uses: ./.github/actions/build-scan-patch-push-container
+        with:
+          registry_login_server: ${{ env.CONTAINER_REGISTRY_LOGIN_SERVER }}
+          acr_keyvault_name: ${{ env.ACR_KEYVAULT_NAME }}
+          acr_token_secret_name: ${{ env.ACR_TOKEN_SECRET_NAME }}
+          image_name: ${{ env.CONTAINER_REGISTRY_PATH }}/${{ env.FRONTEND_IMAGE_NAME }}
+          image_tag: ${{ steps.version.outputs.imageTag }}
+          version_tag: ${{ steps.version.outputs.version }}
+          docker_context: .
+          dockerfile_path: ./frontend/apps/myrac/Dockerfile
+          azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+        env:
+          CONTAINER_REGISTRY_LOGIN_SERVER: racwa.azurecr.io
+          CONTAINER_REGISTRY_PATH: rac-digital
+          FRONTEND_IMAGE_NAME: myrac-frontend
+          ACR_KEYVAULT_NAME: acr-racwa
+          ACR_TOKEN_SECRET_NAME: rac-digital-write-access
+
+  test_unit:
+    name: Test - Unit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: 🧪 Test
+        run: pnpm test:coverage --filter=${{ env.APP_NAME }}
+
+      - name: 📔 Run codacy-coverage-reporter
+        uses: codacy/codacy-coverage-reporter-action@89d6c85cfafaec52c72b6c5e8b2878d33104c699 # v1
+        if: ${{ hashFiles(format('{0}/coverage/lcov.info', github.workspace)) != '' }}
+        with:
+          api-token: ${{ secrets.CODACY_API_TOKEN }}
+          coverage-reports: ${{ github.workspace }}/coverage/lcov.info
+
+  test_storybook:
+    name: Test - Storybook
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: 🎭 Setup Playwright Dependency
+        shell: pwsh
+        run: |
+          pnpm exec playwright install chromium
+          if (-not $?) {
+            pnpm dlx playwright install --with-deps chromium
+          }
+
+      - name: 🧪 Test
+        shell: pwsh
+        run: |
+          pnpm dlx concurrently -k -s first -n "SB,TEST" -c "magenta,blue" "pnpm storybook:ci && pnpm dlx http-server storybook-static --port 6006 --silent" "pnpm dlx wait-on http://127.0.0.1:6006 && pnpm storybook:test --includeTags '${{ env.APP_NAME }}' --index-json"
+
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: 🚨 Lint
+        run: pnpm lint:ci --filter=${{ env.APP_NAME }}
+
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: ✍ Format
+        run: pnpm format:ci --filter=${{ env.APP_NAME }}
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: 👮 Typecheck
+        run: pnpm typecheck --filter=${{ env.APP_NAME }}
+
+  affected_shared_packages:
+    name: Find affected packages
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      affected-packages: ${{ steps.detect-affected-shared-packages.outputs.affected-packages }}
+      has-affected-packages: ${{ steps.detect-affected-shared-packages.outputs.has-affected-packages }}
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🔍 Detect changed shared packages
+        uses: ./.github/actions/shared-package-matrix
+        id: detect-affected-shared-packages
+
+  test_affected_packages:
+    name: Test affected packages
+    needs: affected_shared_packages
+    runs-on: ubuntu-latest
+    if: ${{ needs.affected_shared_packages.outputs.has-affected-packages == 'true' }}
+
+    strategy:
+      matrix:
+        package: ${{ fromJson(needs.affected_shared_packages.outputs.affected-packages) }}
+      fail-fast: false
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🦺 Setup
+        uses: ./.github/actions/setup
+        with:
+          npm-token: ${{ secrets.AZURE_NPM_TOKEN }}
+
+      - name: 🧪 Test affected package ${{ matrix.package }}
+        run: |
+          echo "🛠️ Building package ${{ matrix.package }}"
+          pnpm run test --filter=${{ matrix.package }}
+
+      - name: 🧪 Storybook Test affected package ${{ matrix.package }}
+        if: ${{ matrix.package == '@racwa/mfa' || matrix.package == '@racwa/ui' }}
+        shell: pwsh
+        run: |
+          pnpm exec playwright install chromium
+          if (-not $?) {
+            pnpm dlx playwright install --with-deps chromium
+          }
+
+          pnpm dlx concurrently -k -s first -n "SB,TEST" -c "magenta,blue" "pnpm storybook:ci && pnpm dlx http-server storybook-static --port 6006 --silent" "pnpm dlx wait-on http://127.0.0.1:6006 && pnpm storybook:test --includeTags '${{ matrix.package }}' --index-json"
+
+  dev_deploy:
+    name: Deploy to DEV
+    runs-on: digital-npe-ubuntu-latest
+    needs: build
+    environment: myrac-dev
+
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -refresh=false
+            -var="image_version=${{ needs.build.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../frontend/apps/${{ env.APP_NAME }}/infra/templates/resources/container-app/${{ env.APP_NAME }}-frontend-template.yaml"
+            -var="container_apps_folder=../../../frontend/apps/${{ env.APP_NAME }}/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_${{ env.APP_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: ${{ github.event_name != 'workflow_dispatch' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: dev
+          APP_NAME: myrac
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: 🐙 Terraform Apply
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tf.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve -refresh=false
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tf.plan'
+
+  test_e2e_dev:
+    name: Test DEV - E2E
+    # disabled until we add e2e tests
+    if: false
+    runs-on: digital-npe-ubuntu-latest
+    needs: dev_deploy
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    container:
+      image: mcr.microsoft.com/playwright:v1.51.0-noble@sha256:dcc7a57c035cea22d94ef62edaf4e63b2d84352d990f936424344c6b05a3d9b4
+      options: --user 1001
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎭 Run Playwright Tests
+        uses: ./.github/actions/run-playwright-tests
+        with:
+          azure_client_id: '${{ vars.AZURE_CLIENT_ID }}'
+          azure_tenant_id: '${{ vars.AZURE_TENANT_ID }}'
+          azure_subscription_id: '${{ vars.AZURE_SUBSCRIPTION_ID }}'
+          npm_token: '${{ secrets.AZURE_NPM_TOKEN }}'
+          application_name: '${{ env.APP_NAME }}'
+          playwright_working_directory: 'frontend/apps/myrac'
+          environment: 'dev'
+
+  sit_deploy:
+    name: Deploy to SIT
+    runs-on: digital-npe-ubuntu-latest
+    if: needs.build.outputs.is_main == 'true'
+    needs: [build, test_unit, test_storybook, lint, format, typecheck]
+    environment: myrac-sit
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📺 Terraform Plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -refresh=false
+            -var="image_version=${{ needs.build.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../frontend/apps/${{ env.APP_NAME }}/infra/templates/resources/container-app/${{ env.APP_NAME }}-frontend-template.yaml"
+            -var="container_apps_folder=../../../frontend/apps/${{ env.APP_NAME }}/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_${{ env.APP_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: sit
+          APP_NAME: myrac
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: 🐙 Terraform Apply
+        shell: bash
+        run: |
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' show "${{ env.TERRAFORM_PLAN_FILE }}"
+          terraform -chdir='${{ env.TERRAFORM_DIRECTORY }}' apply ${{ env.TERRAFORM_OPTIONS }} "${{ env.TERRAFORM_PLAN_FILE }}"
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+          TERRAFORM_PLAN_FILE: 'tf.plan'
+          TERRAFORM_OPTIONS: -input=false -auto-approve -refresh=false
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_plan_file: 'tf.plan'
+
+  test_e2e_sit:
+    name: Test SIT - E2E
+    # disabled until we add e2e tests
+    if: false
+    runs-on: digital-npe-ubuntu-latest
+    needs: sit_deploy
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    container:
+      image: mcr.microsoft.com/playwright:v1.51.0-noble@sha256:dcc7a57c035cea22d94ef62edaf4e63b2d84352d990f936424344c6b05a3d9b4
+      options: --user 1001
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎭 Run Playwright Tests
+        uses: ./.github/actions/run-playwright-tests
+        with:
+          azure_client_id: '${{ vars.AZURE_CLIENT_ID }}'
+          azure_tenant_id: '${{ vars.AZURE_TENANT_ID }}'
+          azure_subscription_id: '${{ vars.AZURE_SUBSCRIPTION_ID }}'
+          npm_token: '${{ secrets.AZURE_NPM_TOKEN }}'
+          application_name: '${{ env.APP_NAME }}'
+          playwright_working_directory: 'frontend/apps/myrac'
+          environment: 'sit'
+
+  uat_plan:
+    # We want this check so that the deployment section in the repository shows the most recent deployment, and not 'waiting' for deployment
+    if: needs.build.outputs.is_main == 'true' && github.run_attempt > 1
+    name: Deploy to UAT - Plan
+    runs-on: digital-npe-ubuntu-latest
+    needs: [build, test_unit, test_storybook, lint, format, typecheck]
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      terraform_plan_filename: ${{ steps.terraform_plan.outputs.terraform_plan_filename }}
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📺 Terraform Plan
+        id: terraform_plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: >-
+            -input=false
+            -var="image_version=${{ needs.build.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../frontend/apps/${{ env.APP_NAME }}/infra/templates/resources/container-app/${{ env.APP_NAME }}-frontend-template.yaml"
+            -var="container_apps_folder=../../../frontend/apps/${{ env.APP_NAME }}/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_${{ env.APP_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: uat
+          APP_NAME: myrac
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+  uat_deploy:
+    name: Deploy to UAT - Apply
+    runs-on: digital-npe-ubuntu-latest
+    needs: [uat_plan]
+    environment: myrac-uat
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🐙 Terraform Apply
+        uses: ./.github/actions/apply-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/npe'
+          terraform_options: '-input=false -auto-approve'
+          terraform_backend_key: 'infrastructure_container_app_${{ env.APP_NAME }}_${{ env.ENV }}.tfstate'
+          terraform_plan_filename: '${{ needs.uat_plan.outputs.terraform_plan_filename }}'
+        env:
+          ENV: uat
+          APP_NAME: myrac
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: '${{ env.TERRAFORM_DIRECTORY }}'
+          terraform_plan_file: '${{ needs.uat_plan.outputs.terraform_plan_filename }}'
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/npe'
+
+  test_e2e_uat:
+    name: Test UAT - E2E
+    # disabled until we add e2e tests
+    if: false
+    runs-on: digital-npe-ubuntu-latest
+    needs: uat_deploy
+    environment: npe
+
+    permissions:
+      id-token: write
+      contents: read
+
+    container:
+      image: mcr.microsoft.com/playwright:v1.51.0-noble@sha256:dcc7a57c035cea22d94ef62edaf4e63b2d84352d990f936424344c6b05a3d9b4
+      options: --user 1001
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎭 Run Playwright Tests
+        uses: ./.github/actions/run-playwright-tests
+        with:
+          azure_client_id: '${{ vars.AZURE_CLIENT_ID }}'
+          azure_tenant_id: '${{ vars.AZURE_TENANT_ID }}'
+          azure_subscription_id: '${{ vars.AZURE_SUBSCRIPTION_ID }}'
+          npm_token: '${{ secrets.AZURE_NPM_TOKEN }}'
+          application_name: '${{ env.APP_NAME }}'
+          playwright_working_directory: 'frontend/apps/myrac'
+          environment: 'uat'
+
+  prd_plan:
+    # We want this check so that the deployment section in the repository shows the most recent deployment, and not 'waiting' for deployment
+    if: needs.build.outputs.is_main == 'true' && github.run_attempt > 1
+    name: Deploy to PRD - Plan
+    runs-on: ubuntu-latest
+    needs: [build, test_unit, test_storybook, lint, format, typecheck]
+    environment: prd
+
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      terraform_plan_filename: ${{ steps.terraform_plan.outputs.terraform_plan_filename }}
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 📺 Terraform Plan
+        id: terraform_plan
+        uses: ./.github/actions/deploy-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/prd'
+          terraform_options: >-
+            -input=false
+            -var="image_version=${{ needs.build.outputs.version }}"
+            -var="environment=${{ env.ENV }}"
+            -var="template_file=../../../frontend/apps/${{ env.APP_NAME }}/infra/templates/resources/container-app/${{ env.APP_NAME }}-frontend-template.yaml"
+            -var="container_apps_folder=../../../frontend/apps/${{ env.APP_NAME }}/infra/${{ env.ENV }}/resources/container-app"
+          terraform_backend_key: 'infrastructure_container_app_${{ env.APP_NAME }}_${{ env.ENV }}.tfstate'
+          is_pull_request: false
+          upload_plan_azure_storage: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: prd
+          APP_NAME: myrac
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+  prd_deploy:
+    name: Deploy to PRD - Apply
+    runs-on: ubuntu-latest
+    needs: [build, prd_plan]
+    environment: myrac-prd
+
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: 👩‍💻 Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: 🎤 Log in to Azure
+        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: 🐙 Terraform Apply
+        uses: ./.github/actions/apply-plan
+        with:
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          arm_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          terraform_directory: 'infrastructure/container-app/prd'
+          terraform_options: '-input=false -auto-approve'
+          terraform_backend_key: 'infrastructure_container_app_${{ env.APP_NAME }}_${{ env.ENV }}.tfstate'
+          terraform_plan_filename: '${{ needs.prd_plan.outputs.terraform_plan_filename }}'
+        env:
+          ENV: prd
+          APP_NAME: myrac
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+      - name: ⏳ Wait for revision to be healthy
+        uses: ./.github/actions/wait-for-revision
+        with:
+          terraform_directory: '${{ env.TERRAFORM_DIRECTORY }}'
+          terraform_plan_file: '${{ needs.prd_plan.outputs.terraform_plan_filename }}'
+        env:
+          TERRAFORM_DIRECTORY: 'infrastructure/container-app/prd'
+
+      - name: 🏷️ Git Tag
+        id: git-tag
+        uses: './.github/actions/create-git-tag'
+        if: always()
+        with:
+          application: ${{ env.GIT_TAG }}
+          is_production: true
+          release_notes: ${{ needs.build.outputs.release-notes }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

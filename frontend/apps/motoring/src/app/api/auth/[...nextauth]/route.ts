@@ -1,0 +1,11 @@
+import NextAuth from "next-auth/next";
+
+import { authOptions } from "@racwa/auth";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+const handler = NextAuth({
+  ...authOptions,
+  pages: { signIn: "/motoring/signIn" },
+});
+
+export { handler as GET, handler as POST };

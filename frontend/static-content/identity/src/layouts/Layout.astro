@@ -1,0 +1,365 @@
+---
+import appleTouchIcon from "../../public/favicons/apple-touch-icon.png";
+import favicon16 from "../../public/favicons/favicon-16x16.png";
+import favicon32 from "../../public/favicons/favicon-32x32.png";
+import favicon from "../../public/favicons/favicon.ico";
+import background from "../../public/images/background.jpg";
+import Analytics from "../components/Analytics.astro";
+import Backdrop from "../components/Backdrop.astro";
+import Reference from "../components/Reference.astro";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const racHomePage = import.meta.env.PUBLIC_RAC_HOME_PAGE;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="description"
+      content="Register your account to sign up for myRAC."
+    />
+    <meta name="viewport" content="width=device-width" />
+    <title>{title}</title>
+    <!-- Favicons -->
+    <link rel="shortcut icon" href={favicon} type="image/x-icon" />
+    <link rel="apple-touch-icon" sizes="180x180" href={appleTouchIcon.src} />
+    <link rel="icon" type="image/png" sizes="32x32" href={favicon32.src} />
+    <link rel="icon" type="image/png" sizes="16x16" href={favicon16.src} />
+    <!-- End Favicons -->
+    <Analytics />
+    <Reference id="refRacHomePage" value=`${racHomePage}` />
+  </head>
+  <body>
+    <div class="wrapper" style="color: #33424D">
+      <div
+        class="main"
+        style=`background: url('${background.src}') center 0 no-repeat; background-size: cover;`
+      >
+        <div id="content-container">
+          <slot />
+        </div>
+      </div>
+    </div>
+    <Backdrop />
+  </body>
+</html>
+
+<script is:inline>
+  function isElementVisible(selector) {
+    return $(selector).length > 0 && $(selector).css("display") !== "none";
+  }
+
+  $(
+    "<style>#simplemodal-overlay,#simplemodal-container { display: none !important;}</style>",
+  ).appendTo("head");
+</script>
+
+<style is:inline>
+  body {
+    overflow: auto;
+    overflow-x: hidden;
+    font-family:
+      "Stag Sans Web", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 1rem;
+    font-weight: normal;
+    line-height: 1.44444444;
+    color: #33424d;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    margin: 0;
+    padding: 0;
+  }
+
+  main {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  h1 {
+    font-family: "Stag Sans Web", Helvetica, Arial, sans-serif;
+    font-weight: 700;
+    font-size: 2rem;
+    line-height: 1.125;
+    text-align: center;
+  }
+
+  p,
+  .p {
+    margin: 0;
+    font-family: "Stag Sans Web", Helvetica, Arial, sans-serif;
+    font-weight: 300;
+    font-size: 1.125rem;
+    line-height: 1.4444;
+  }
+
+  .errorMessage {
+    margin-top: 5px;
+    color: #a94442;
+    font-size: 12px;
+    font-weight: 300;
+  }
+
+  a {
+    font-weight: 400;
+    color: #0062b2;
+    text-decoration: underline;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  ol li::marker {
+    font-size: 16px;
+    font-weight: 300;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="phone"],
+  input[type="date"] {
+    font-size: 16px;
+    line-height: 1.44444444;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 12px 12px;
+    transition:
+      border-color ease-in-out 0.15s,
+      box-shadow ease-in-out 0.15s;
+    color: #425563;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background-color: #fff;
+    background-image: none;
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+
+    &:focus {
+      border-color: #66afe9;
+      outline: 0;
+      box-shadow:
+        inset 0 1px 1px rgba(0, 0, 0, 0.075),
+        0 0 8px rgba(102, 175, 233, 0.6);
+    }
+
+    &::placeholder {
+      color: #999;
+    }
+
+    &.formError {
+      border-color: #a94442;
+      &:focus {
+        box-shadow: none;
+      }
+    }
+  }
+
+  label,
+  legend {
+    text-align: left;
+    display: inline-block;
+    max-width: 100%;
+    font-family: "Stag Sans Web", Helvetica, Arial, sans-serif;
+    line-height: 1.4;
+    font-size: 1.125rem;
+    font-weight: 400;
+    color: rgb(51, 66, 77);
+    margin-bottom: 8px;
+    margin-top: 0px;
+
+    &.formError {
+      color: #a94442;
+    }
+  }
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding-left: 0;
+  }
+
+  #attributeList {
+    margin-bottom: 16px;
+  }
+
+  #cancel-link {
+    width: 100%;
+    display: block;
+    text-align: center;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  #continue {
+    margin-top: 24px;
+  }
+
+  .attrEntry {
+    .error {
+      > p {
+        color: #a94442;
+        font-size: rem(14);
+        margin-bottom: rem(5);
+      }
+    }
+  }
+
+  .attrEntry .tiny,
+  .phoneEntry .tiny,
+  #codeVerification .tiny {
+    display: none;
+  }
+
+  .btn-primary,
+  .buttons button {
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 1.44444444;
+    display: inline-flexbox;
+    margin: 0;
+    padding: 10px 18px;
+    width: 100%;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background-image: none;
+    -ms-touch-action: manipulation;
+    touch-action: manipulation;
+    transition: all ease-out 0.3s;
+    color: #33424d;
+    border: 1px solid rgba(24, 45, 60, 0.1);
+    background-color: #ffd100;
+    font-family: "Stag Sans Web", Helvetica, Arial, sans-serif;
+    min-width: 64px;
+    transition:
+      background-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,
+      box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,
+      border 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
+
+    &:focus {
+      transition: none;
+    }
+
+    &:focus,
+    &:hover {
+      color: #ffd100;
+      border-color: #0a0d10;
+      background-color: #33424d;
+    }
+
+    &.btn-link {
+      color: #0062b2;
+      font-size: 14px;
+      font-style: normal;
+      font-weight: 400;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      width: min-content;
+      padding: 0;
+    }
+  }
+
+  .error {
+    color: #a94442;
+    font-size: 12px;
+    font-weight: 300;
+    margin-top: 5px;
+    margin-bottom: 5px;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 0;
+    display: flex !important;
+    width: 100%;
+    min-height: 100vh;
+    flex-direction: column;
+  }
+
+  .main {
+    flex: 1;
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #content-container {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    background-color: #f4f7f9;
+    width: 100%;
+    max-width: 560px;
+    margin: 60px 60px 40px 60px;
+    padding: 32px 16px;
+    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+  }
+
+  ::-ms-reveal {
+    display: none;
+  }
+
+  @media (max-width: 720px) {
+    #content-container {
+      margin: 0;
+      box-shadow: none;
+      max-width: none;
+      box-sizing: border-box;
+      padding: 32px 16px;
+      width: 100vw;
+      height: 100vh;
+    }
+  }
+
+  #content-box {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+    background: white;
+    border-radius: 8px;
+    margin: 24px 16px;
+    padding: 40px 24px;
+  }
+
+  @font-face {
+    font-family: "Stag Sans Web";
+    font-weight: 300;
+    font-style: normal;
+    src: url("https://insurance-cdn.rac.com.au/assets/fonts/StagSans-Light-Web.woff")
+      format("woff");
+  }
+
+  @font-face {
+    font-family: "Stag Sans Web";
+    font-weight: 400;
+    font-style: normal;
+    font-stretch: normal;
+    src: url("https://insurance-cdn.rac.com.au/assets/fonts/StagSans-Book-Web.woff")
+      format("woff");
+  }
+
+  @font-face {
+    font-family: "Stag Sans Web";
+    font-weight: 700;
+    font-style: normal;
+    src: url("https://insurance-cdn.rac.com.au/assets/fonts/StagSans-Bold-Web.woff")
+      format("woff");
+  }
+</style>
