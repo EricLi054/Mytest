@@ -1,54 +1,33 @@
-type Environment = "SIT" | "UAT";
-
-export const getCurrentEnv = (): Environment => {
-  const env = process.env.PLAYWRIGHT_ENV?.toUpperCase();
-  if (env !== "SIT" && env !== "UAT") {
-    return "SIT";
-  }
-  return env;
-};
-
-export const getBaseUrl = (): string => {
-  const env = getCurrentEnv();
-  switch (env) {
-    case "SIT":
-      return process.env.PLAYWRIGHT_BASE_SIT_URL ?? "";
-    case "UAT":
-      return process.env.PLAYWRIGHT_BASE_UAT_URL ?? "";
-    default:
-      throw new Error("The environment is not correct, and no valid URL can be determined.");
-  }
-};
-
-export const baseURL: string = getBaseUrl();
+export type MyRacPage =
+  | "/"
+  | "/profile"
+  | "/your-contact-details"
+  | "/membership"
+  | "/request-plastic-card"
+  | "/lapsed-membership"
+  | `/profile`;
 
 export const urls = {
-  login: "/login",
   landing: "/",
+  login: "/login",
+  logout: "/logout",
   myrac: "/myrac",
   profile: "/profile",
   contactDetails: "/your-contact-details",
   membership: "/membership",
   requestPlasticCard: "/request-plastic-card",
   lapsedMembership: "/lapsed-membership",
-  logout: `${baseURL}/logout`,
-  updateMyDetails: {
-    base: `${baseURL}/myrac/update-my-details`,
-    wildcard: "**/update-my-details?**",
-  },
-  somethingWentWrong: `${baseURL}/something-went-wrong`,
-  faq: `${baseURL}/myrac/help`,
-  lifeInsurance: `${baseURL}/myrac/products/life-insurance`,
+  somethingWentWrong: `/something-went-wrong`,
+  faq: `/myrac/help`,
+  lifeInsurance: `/myrac/products/life-insurance`,
 } as const;
 
-export const myracUrl = (path: string) => `/myrac${path}` as const;
+export const myracUrl = (page: MyRacPage) => `/myrac${page}` as const;
 
 // For backward compatibility
 export const loginPageURL = urls.login;
 export const landingPageURL = urls.landing;
 export const contactDetailsPageURL = urls.contactDetails;
-export const updateMyDetailsPageBaseURL = urls.updateMyDetails.base;
-export const updateMyDetailsPageURLWildcard = urls.updateMyDetails.wildcard;
 export const somethingWentWrongPageURL = urls.somethingWentWrong;
 export const faqPageURL = urls.faq;
 export const lifeInsurancePageURL = urls.lifeInsurance;
