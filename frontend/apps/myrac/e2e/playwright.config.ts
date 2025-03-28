@@ -12,6 +12,7 @@ const devicesToTest = (): Device[] => {
     case "dev":
       return ["Desktop Chrome", "iPhone 12"];
     case "sit":
+      return ["Desktop Chrome"];
     case "uat":
       return ["Desktop Chrome", "Desktop Firefox", "Desktop Safari", "iPhone 12", "Pixel 5"];
   }
@@ -36,6 +37,7 @@ const retries = () => {
     case "dev":
       return 0;
     case "sit":
+      return 0;
     case "uat":
       return 2;
   }
@@ -62,8 +64,8 @@ export default defineConfig({
       testMatch: "global.setup.ts",
     },
     ...devicesToTest().map((device) => ({
-      name: `Roadside Assistance - Update Your Vehicle - ${device}`,
-      testDir: "roadside-assistance/update-your-vehicle",
+      name: `Random test with - ${device}`,
+      testDir: "./tests",
       testMatch: "*.spec.ts",
       dependencies: ["Global Setup"],
       use: { ...devices[`${device}`] },
