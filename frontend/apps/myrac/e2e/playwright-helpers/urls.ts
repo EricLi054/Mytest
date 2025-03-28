@@ -23,10 +23,15 @@ export const getBaseUrl = (): string => {
 export const baseURL: string = getBaseUrl();
 
 export const urls = {
-  landing: `${baseURL}`,
-  login: "https://login*.rac*.com.au/**",
+  login: "/login",
+  landing: "/",
+  myrac: "/myrac",
+  profile: "/profile",
+  contactDetails: "/your-contact-details",
+  membership: "/membership",
+  requestPlasticCard: "/request-plastic-card",
+  lapsedMembership: "/lapsed-membership",
   logout: `${baseURL}/logout`,
-  contactDetails: `${baseURL}/myrac/profile/contact-details`,
   updateMyDetails: {
     base: `${baseURL}/myrac/update-my-details`,
     wildcard: "**/update-my-details?**",
@@ -34,7 +39,9 @@ export const urls = {
   somethingWentWrong: `${baseURL}/something-went-wrong`,
   faq: `${baseURL}/myrac/help`,
   lifeInsurance: `${baseURL}/myrac/products/life-insurance`,
-};
+} as const;
+
+export const myracUrl = (path: string) => `/myrac${path}` as const;
 
 // For backward compatibility
 export const loginPageURL = urls.login;
