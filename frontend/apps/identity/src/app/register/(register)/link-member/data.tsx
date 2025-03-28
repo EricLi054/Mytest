@@ -5,8 +5,6 @@ import { graphql } from "gql.tada";
 
 import { execute } from "@racwa/gql";
 
-const { GRAPHQL_ENDPOINT } = serverEnv();
-
 const updateAdAccountCrmIdQuery = graphql(`
   mutation updateAdAccountCrmId($adb2cAccountId: String!, $crmId: String!) {
     updateAdAccountCrmId(adb2cAccountId: $adb2cAccountId, crmId: $crmId) {
@@ -29,7 +27,7 @@ export const UpdateADB2CAccountCrmId = async (
     crmId,
   };
   const data = await execute({
-    endpoint: GRAPHQL_ENDPOINT,
+    endpoint: serverEnv().GRAPHQL_ENDPOINT,
     token,
     query: updateAdAccountCrmIdQuery,
     sourceSystem: "identity",

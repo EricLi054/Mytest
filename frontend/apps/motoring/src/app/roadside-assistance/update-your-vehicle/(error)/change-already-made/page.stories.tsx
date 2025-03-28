@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { EMPTY_URL } from "#constants";
-import { mockChangeAlreadyMadeContentfulData } from "#mocks/mockContentful";
+import { mockChangeAlreadyMadeContentfulData } from "#mocks/contentful";
 
 import Component from "./container";
 

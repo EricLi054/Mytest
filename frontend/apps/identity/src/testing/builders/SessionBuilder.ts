@@ -1,6 +1,8 @@
 import type { Person } from "#app/register/(register)/match/types/index";
 import type { RegistrationSession } from "#utils/session";
 
+import { createMfaSessionKey } from "@racwa/mfa";
+
 export default class SessionBuilder {
   session: RegistrationSession;
 
@@ -8,6 +10,7 @@ export default class SessionBuilder {
     // Initialise with an empty session
     this.session = {
       id: undefined,
+      mfaSessionKey: undefined,
       redirectUrl: undefined,
       person: undefined,
       incorrectMatchAttempts: 0,
@@ -24,6 +27,9 @@ export default class SessionBuilder {
 
   withSessionId(sessionId: string | undefined): SessionBuilder {
     this.session.id = sessionId;
+    if (sessionId) {
+      this.session.mfaSessionKey = createMfaSessionKey("my-rac-account-registration", sessionId);
+    }
     return this;
   }
 

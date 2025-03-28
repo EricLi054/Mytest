@@ -1,7 +1,7 @@
 import type { DigitalCardDetails } from "#components/MemberDetailsBar/types";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import { fas } from "@fortawesome/free-solid-svg-icons";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { ModalProvider } from "#providers/modal";
 import { logEvent } from "#utils/analyticsTagging";
 import { testHelper } from "#utils/testHelper";
@@ -95,127 +95,5 @@ describe("DigitalCard", () => {
     await testHelper.clickButton("close", screen);
 
     expect(logEvent).toHaveBeenCalledWith("Digital card mobile modal - Close");
-  });
-
-  it("should display a promotional tooltip on first login", () => {
-    testHelper.mockDesktopDevice();
-    getItemMock.mockReturnValueOnce(undefined);
-
-    render(
-      <ModalProvider>
-        <RACMemberCard {...props} storageKey="test" />
-      </ModalProvider>,
-    );
-
-    expect(getItemMock).toHaveBeenCalled();
-    expect(screen.getByText("Add card to your mobile wallet")).toBeVisible();
-  });
-
-  it("should display a promotional tooltip on second login", () => {
-    testHelper.mockDesktopDevice();
-    getItemMock.mockReturnValueOnce(JSON.stringify({ count: 1, lastShown: "someotherday" }));
-
-    render(
-      <ModalProvider>
-        <RACMemberCard {...props} storageKey="test" />
-      </ModalProvider>,
-    );
-
-    expect(getItemMock).toHaveBeenCalled();
-    expect(screen.getByText("Add card to your mobile wallet")).toBeVisible();
-  });
-
-  it("should not display a promotional tooltip on third login", () => {
-    testHelper.mockDesktopDevice();
-    getItemMock.mockReturnValueOnce(JSON.stringify({ count: 2, lastShown: "someotherday" }));
-
-    render(
-      <ModalProvider>
-        <RACMemberCard {...props} storageKey="test" />
-      </ModalProvider>,
-    );
-
-    expect(getItemMock).toHaveBeenCalled();
-    expect(screen.queryByText("Add card to your mobile wallet")).toBeNull();
-  });
-
-  it("should not display a promotional tooltip if already seen it today", () => {
-    testHelper.mockDesktopDevice();
-    getItemMock.mockReturnValueOnce(JSON.stringify({ count: 1, lastShown: new Date().toDateString() }));
-
-    render(
-      <ModalProvider>
-        <RACMemberCard {...props} storageKey="test" />
-      </ModalProvider>,
-    );
-
-    expect(getItemMock).toHaveBeenCalled();
-    expect(screen.queryByText("Add card to your mobile wallet")).toBeNull();
-  });
-
-  it("should not display a promotional tooltip if error parsing", () => {
-    testHelper.mockDesktopDevice();
-    getItemMock.mockReturnValueOnce("invalid json");
-
-    render(
-      <ModalProvider>
-        <RACMemberCard {...props} storageKey="test" />
-      </ModalProvider>,
-    );
-
-    expect(getItemMock).toHaveBeenCalled();
-    expect(screen.queryByText("Add card to your mobile wallet")).toBeNull();
-  });
-
-  it("should close promotional tooltip when close button clicked", async () => {
-    testHelper.mockDesktopDevice();
-    getItemMock.mockReturnValueOnce(undefined);
-
-    render(
-      <ModalProvider>
-        <RACMemberCard {...props} storageKey="test" />
-      </ModalProvider>,
-    );
-
-    expect(getItemMock).toHaveBeenCalled();
-    expect(screen.getByText("Add card to your mobile wallet")).toBeVisible();
-
-    await testHelper.clickButton("", screen);
-
-    expect(setItemMock).toHaveBeenCalledWith(
-      "test",
-      JSON.stringify({ count: 1, lastShown: new Date().toDateString() }),
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByText("Add card to your mobile wallet")).toBeNull();
-    });
-  });
-
-  it("should close promotional tooltip when modal opened", async () => {
-    testHelper.mockDesktopDevice();
-    getItemMock.mockReturnValueOnce(undefined);
-
-    render(
-      <ModalProvider>
-        <RACMemberCard {...props} storageKey="test" />
-      </ModalProvider>,
-    );
-
-    expect(getItemMock).toHaveBeenCalled();
-    expect(screen.getByText("Add card to your mobile wallet")).toBeVisible();
-
-    await testHelper.clickText("Digital card", screen);
-
-    expect(setItemMock).toHaveBeenCalledWith(
-      "test",
-      JSON.stringify({ count: 1, lastShown: new Date().toDateString() }),
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByText("Add card to your mobile wallet")).toBeNull();
-    });
-
-    expect(screen.getByText("Get your digital card now")).toBeVisible();
   });
 });

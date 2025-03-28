@@ -1,9 +1,6 @@
 import type { PersonSchema } from "#graphql/person/queries/schema";
 import type { z } from "zod";
 
-import NameChangeConfirmationContent from "./NameChangeConfirmationContent";
-import logNameChangeEvent from "./util";
-
 export const getEditNameFormStep2Schema = (person: z.infer<typeof PersonSchema>) => {
   return [
     {
@@ -73,19 +70,10 @@ export const getEditNameFormStep2Schema = (person: z.infer<typeof PersonSchema>)
       name: "firstName",
       component: "text-field",
       label: "First name",
-      required: true,
+      required: false,
       placeholder: "e.g. John",
-      validate: [
-        {
-          type: "required",
-          message: "Please enter a valid first name",
-        },
-        {
-          type: "name",
-          message: "Please enter a valid first name",
-          nameType: "firstName",
-        },
-      ],
+      disabled: true,
+      helperText: "Sorry, you can't change this online.",
       initialValue: person.firstName,
       initializeOnMount: true,
     },
@@ -175,15 +163,6 @@ export const getEditNameFormStep2Schema = (person: z.infer<typeof PersonSchema>)
       successTitle: "You've updated your name",
       errorButtonText: "Okay",
       successButtonText: "Okay",
-      requiresConfirmation: (dirtyValues: Record<string, boolean>): boolean => {
-        if (dirtyValues.firstName) {
-          return true;
-        }
-        return false;
-      },
-      confirmationTitle: "Your first name is important",
-      ConfirmationContent: NameChangeConfirmationContent,
-      confirmationLogger: logNameChangeEvent,
     },
     {
       name: "cancel",

@@ -1,17 +1,18 @@
+import { useActionState } from "react";
 import { render, screen } from "@testing-library/react";
-import { mockConfirmVehicleContentfulData } from "#mocks/mockContentful";
-import { describe, expect, it, vi } from "vitest";
+import { mockConfirmVehicleContentfulData } from "#mocks/contentful";
+import { useFormStatus } from "react-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ConfirmVehicleForm from "./form";
 
-// Imported server action also imports server-only code
 vi.mock("server-only", () => ({}));
 
 vi.mock("react-dom", async () => {
   const actual = await vi.importActual("react-dom");
   return {
     ...actual,
-    useFormStatus: vi.fn().mockReturnValue({ pending: false }),
+    useFormStatus: vi.fn(),
   };
 });
 
@@ -19,11 +20,16 @@ vi.mock("react", async () => {
   const actual = await vi.importActual("react");
   return {
     ...actual,
-    useActionState: vi.fn().mockReturnValue([{}, vi.fn(), false]),
+    useActionState: vi.fn(),
   };
 });
 
 describe("ConfirmVehicleForm", () => {
+  beforeEach(() => {
+    vi.mocked(useActionState).mockReturnValue([{}, vi.fn(), false]);
+    vi.mocked(useFormStatus).mockReturnValue({ pending: false, data: null, method: null, action: null });
+  });
+
   it("should be able to render", () => {
     render(<ConfirmVehicleForm contentfulData={mockConfirmVehicleContentfulData} confirmVehicleAction={vi.fn()} />);
 

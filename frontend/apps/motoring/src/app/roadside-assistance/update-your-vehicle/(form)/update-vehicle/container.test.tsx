@@ -1,18 +1,18 @@
+import { useActionState } from "react";
 import { render, screen } from "@testing-library/react";
-import { mockUpdateVehicleContentfulData } from "#mocks/mockContentful";
-import { describe, expect, it, vi } from "vitest";
+import { mockUpdateVehicleContentfulData } from "#mocks/contentful";
+import { useFormStatus } from "react-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { UpdateVehicleContainerProps } from "./container";
 import UpdateVehicleContainer from "./container";
 
-// Imported server action in form.tsx also imports server-only code
 vi.mock("server-only", () => ({}));
 
 vi.mock("react-dom", async () => {
   const actual = await vi.importActual("react-dom");
   return {
     ...actual,
-    useFormStatus: vi.fn().mockReturnValue({ pending: false }),
+    useFormStatus: vi.fn(),
   };
 });
 
@@ -20,17 +20,18 @@ vi.mock("react", async () => {
   const actual = await vi.importActual("react");
   return {
     ...actual,
-    useActionState: vi.fn().mockReturnValue([{}, vi.fn(), false]),
+    useActionState: vi.fn(),
   };
 });
 
-const mockProps = {
-  contentfulData: mockUpdateVehicleContentfulData,
-} as const satisfies UpdateVehicleContainerProps;
-
 describe("UpdateVehicleContainer", () => {
+  beforeEach(() => {
+    vi.mocked(useActionState).mockReturnValue([{}, vi.fn(), false]);
+    vi.mocked(useFormStatus).mockReturnValue({ pending: false, data: null, method: null, action: null });
+  });
+
   it("should be able to render", () => {
-    render(<UpdateVehicleContainer {...mockProps} />);
+    render(<UpdateVehicleContainer contentfulData={mockUpdateVehicleContentfulData} />);
 
     expect(screen.getByText("Let's update your vehicle")).toBeVisible();
     expect(

@@ -64,7 +64,7 @@ export const getEditContactDetailsFormStep2Schema = (person: z.infer<typeof Pers
       name: "personalEmailAddress",
       component: "text-field",
       label: "Contact email",
-      helperText: "This is the email we will use to contact you. It may be different from your log-in email.",
+      helperText: "This is the email we will use to contact you. It may be different from your login email.",
       tooltipTitle: null,
       tooltipText: null,
       required: false,

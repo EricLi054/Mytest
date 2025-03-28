@@ -2,7 +2,7 @@ import { FormProvider, getFormProps, useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { ListCardSelectorProps } from "@racwa/react-components";
@@ -91,10 +91,6 @@ const helperText = "Please select an option";
 const submitButton = () => screen.getByRole("button", { name: "Submit" });
 
 describe("SelectionGroup", () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
-
   it("should be able to render", () => {
     render(<TestForm />);
 

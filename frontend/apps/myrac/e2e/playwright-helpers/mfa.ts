@@ -35,7 +35,7 @@ export class MFAHelper {
   static async verifyOTP(page: Page): Promise<void> {
     await expect(page.getByRole("button").getByText("Send code")).toBeVisible();
     await page.getByRole("button").getByText("Send code").click();
-    await expect(page.getByText("Please enter the verification code to verify it’s you")).toBeVisible();
+    await expect(page.getByText("Please enter the verification code to verify it's you")).toBeVisible();
     await this.enterOTP(page);
     await this.closeMFAModal(page);
     await this.handlePostVerification(page);
@@ -80,22 +80,13 @@ export class MFAHelper {
     }
 
     await expect(page.getByRole("button").getByText("Send code")).toBeVisible();
-    const timeVerifyButtonClicked = new Date();
     await page.getByRole("button").getByText("Send code").click({
       timeout: 5000,
     });
-    await expect(page.getByText("Please enter the verification code to verify it’s you")).toBeVisible({
+    await expect(page.getByText("Please enter the verification code to verify it's you")).toBeVisible({
       timeout: 10000,
     });
     await expect(page.getByRole("button").getByText("Verify")).toBeVisible();
-
-    // const code = await this.retrieveLatestCode(timeVerifyButtonClicked);
-    // for (let i = 0; i < 6; i++) {
-    //   await page.getByRole("textbox").nth(i).fill(code[i]);
-    // }
-    // await page.getByRole("button").getByText("Verify").click({
-    //   timeout: 10000,
-    // });
   }
 
   private static async handlePostVerification(page: Page): Promise<void> {
@@ -122,7 +113,7 @@ export class MFAHelper {
 
   private static async handleContactUpdateDialog(page: Page): Promise<void> {
     await page.getByRole("button").getByText("Update contacts").click();
-    await expect(page.getByRole("heading", { name: "You’ve updated your contact details" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "You've updated your contact details" })).toBeVisible({
       timeout: 10000,
     });
     await page.getByRole("button", { name: "Okay" }).click();

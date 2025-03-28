@@ -14,9 +14,15 @@ const isLocal = process.env.CONTAINER_APP_ENV === "local";
 const clientEnvSchema = z.object({
   NEXT_PUBLIC_AUTH_BASE_PATH: z.string().min(1),
   NEXT_PUBLIC_GTM_ID: isLocal ? z.string() : z.string().min(1),
+  NEXT_PUBLIC_RECAPTCHA_SITE_KEY: z.string().min(1),
   NEXT_PUBLIC_RAC_HOMEPAGE_URL: z.string().url(),
-  // TODO - NEXT_PUBLIC_RAC_TERMS_URL var uses NEXT_PUBLIC_RAC_HOMEPAGE_URL, can z.string().url() be used instead?
-  NEXT_PUBLIC_RAC_TERMS_URL: z.string().min(1),
+  NEXT_PUBLIC_RAC_ABOUT_SITE_INFO_URL: z.string().url(),
+  NEXT_PUBLIC_RAC_ABOUT_ACCESSIBILITY_URL: z.string().url(),
+  NEXT_PUBLIC_RAC_ABOUT_DISCLAIMER_URL: z.string().url(),
+  NEXT_PUBLIC_RAC_ABOUT_PRIVACY_URL: z.string().url(),
+  NEXT_PUBLIC_RAC_ABOUT_SECURITY_URL: z.string().url(),
+  NEXT_PUBLIC_RAC_ABOUT_TERMS_URL: z.string().url(),
+  NEXT_PUBLIC_MYRAC_LOGIN_PAGE_URL: z.string().url(),
 });
 
 export const clientEnv = () => {

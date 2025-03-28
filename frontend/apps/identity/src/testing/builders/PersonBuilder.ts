@@ -1,4 +1,4 @@
-import type { OtpVerificationDetails, Person } from "#app/register/(register)/match/types/index";
+import type { Person } from "#app/register/(register)/match/types/index";
 
 export default class PersonBuilder {
   person: Person;
@@ -10,12 +10,6 @@ export default class PersonBuilder {
       firstName: "Anurag",
       mobilePhone: "0412345678",
       membershipType: "Member",
-      otpVerificationDetails: {
-        sessionKey: "my-rac-account-registration-1234356789-987654321",
-        isAuthenticated: false,
-        isMobile: true,
-        phoneNumberSuffix: "678",
-      },
     };
   }
 
@@ -28,8 +22,8 @@ export default class PersonBuilder {
     return this;
   }
 
-  withOtpVerificationDetails(otpVerificationDetails: OtpVerificationDetails | undefined): PersonBuilder {
-    this.person.otpVerificationDetails = otpVerificationDetails ?? null;
+  withMembershipType(membershipType: string): PersonBuilder {
+    this.person.membershipType = membershipType;
     return this;
   }
 }

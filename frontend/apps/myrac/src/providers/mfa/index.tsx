@@ -63,8 +63,8 @@ export const MFAProvider = ({ sessionKey, children }: MFAProviderProps) => {
         <OneTimePasswordDialog
           showDialog={open}
           getVerificationDetails={getVerificationDetails}
-          checkAndSendOtp={sendOtp}
-          checkAndVerifyOtp={verifyOtp}
+          sendOtp={sendOtp}
+          verifyOtp={verifyOtp}
           onClickClose={closeMFAModal}
           onError={onError}
           onSuccess={onSuccess}

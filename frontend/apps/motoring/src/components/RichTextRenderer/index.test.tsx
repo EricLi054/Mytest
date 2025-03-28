@@ -5,7 +5,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { RichText } from "./types";
-import RichTextRenderer from "./index";
+import RichTextRenderer from ".";
 
 const mockRichText: RichText = {
   text: {

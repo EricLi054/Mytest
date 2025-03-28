@@ -1,18 +1,29 @@
+import { useEffect, useState } from "react";
 import { Button } from "@mui/material";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RAC_REGISTRATION_HELP_NUMBER_DISPLAY_FORMAT } from "#utils/constants";
+import { getRegistrationErrorPageUrl } from "#utils/routing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useMfaModalDialog } from "@racwa/mfa";
+import { createMfaSessionKey, useMfaModalDialog } from "@racwa/mfa";
 
-import type { Person } from "../../types";
 import { MfaModalDialogProvider } from ".";
-import { checkAndSendRegistrationOtp } from "../../graphql/checkAndSendRegistrationOtp";
-import { checkAndVerifyRegistrationOtp } from "../../graphql/checkAndVerifyRegistrationOtp";
-import { checkRegistrationOtp } from "../../graphql/checkRegistrationOtp";
+import { getRegistrationOtpVerificationDetails } from "../../graphql/getRegistrationOtpVerificationDetails";
+import { sendRegistrationOtp } from "../../graphql/sendRegistrationOtp";
+import { verifyRegistrationOtp } from "../../graphql/verifyRegistrationOtp";
 
 vi.mock("server-only", () => ({}));
+vi.mock("../../graphql/getRegistrationOtpVerificationDetails", () => ({
+  getRegistrationOtpVerificationDetails: vi.fn(),
+}));
+vi.mock("../../graphql/sendRegistrationOtp", () => ({
+  sendRegistrationOtp: vi.fn(),
+}));
+vi.mock("../../graphql/verifyRegistrationOtp", () => ({
+  verifyRegistrationOtp: vi.fn(),
+}));
+
 const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => {
@@ -21,47 +32,48 @@ vi.mock("next/navigation", () => ({
     };
   },
 }));
-vi.mock("../../graphql/checkRegistrationOtp", () => ({
-  checkRegistrationOtp: vi.fn(),
-}));
-vi.mock("../../graphql/checkAndSendRegistrationOtp", () => ({
-  checkAndSendRegistrationOtp: vi.fn(),
-}));
-vi.mock("../../graphql/checkAndVerifyRegistrationOtp", () => ({
-  checkAndVerifyRegistrationOtp: vi.fn(),
-}));
 
-const mockGetPerson = vi.fn();
-
-const systemUnavailableErrorPageUrl = "/register/error/system-unavailable";
-const mockSessionKey = "my-rac-account-registration-123456789-987654321";
-const mockMatchedPerson: Person = {
-  personId: "00000000-0000-0000-0000-00000000000",
-  racId: "00000001",
-  firstName: "John",
-  mobilePhone: "0400000000",
-  membershipType: "Member",
-  otpVerificationDetails: {
-    sessionKey: mockSessionKey,
-    isAuthenticated: false,
-    isMobile: true,
-    phoneNumberSuffix: "000",
-  },
+const systemUnavailableErrorPageUrl = getRegistrationErrorPageUrl({ page: "/system-unavailable" });
+const mockSessionKey = createMfaSessionKey("my-rac-account-registration", "123456789-987654321");
+const mockOtpVerificationDetails = {
+  sessionKey: mockSessionKey,
+  isAuthenticated: false,
+  isMobile: true,
+  phoneNumberSuffix: "000",
 };
+
+const mockMfaIncompleteStatus = "MFA Incomplete";
+const mockMfaOnErrorStatus = "MFA Error";
+const mockMfaOnSuccessStatus = "MFA Success";
+
+const mockSuccessHandler = vi.fn();
 
 type TestButtonProps = {
   customLoadingMessage?: string;
 };
 
-const mockSuccessHandler = vi.fn();
-
 const TestButton = ({ customLoadingMessage }: TestButtonProps) => {
-  const { openMfaModal } = useMfaModalDialog();
+  const { openMfaModal, mfaOnErrorTriggered, mfaOnSuccessTriggered } = useMfaModalDialog();
+  const [status, setStatus] = useState(mockMfaIncompleteStatus);
   const onClick = () => {
     openMfaModal(mockSuccessHandler, customLoadingMessage);
   };
 
-  return <Button onClick={onClick}>Open</Button>;
+  useEffect(() => {
+    if (mfaOnErrorTriggered) {
+      setStatus(mockMfaOnErrorStatus);
+    }
+    if (mfaOnSuccessTriggered) {
+      setStatus(mockMfaOnSuccessStatus);
+    }
+  }, [mfaOnErrorTriggered, mfaOnSuccessTriggered]);
+
+  return (
+    <>
+      <p>{status}</p>
+      <Button onClick={onClick}>Open</Button>;
+    </>
+  );
 };
 
 const getTestButton = () => screen.getByRole("button", { name: "Open" });
@@ -70,6 +82,16 @@ const getDialog = (name: "Let's verify it's you" | "Enter verification code") =>
 const getFaqLink = () => screen.getByRole("link", { name: "Visit our FAQs" });
 const getNeedHelpLink = () => screen.getByRole("link", { name: RAC_REGISTRATION_HELP_NUMBER_DISPLAY_FORMAT });
 const getSendCodeButton = () => screen.getByRole("button", { name: "Send code" });
+
+/**
+ * Inidicates that the `useMfaModalDialog` hook has returned `mfaOnErrorTriggered` value as true on error
+ */
+const assertMfaOnErrorTriggered = () => expect(screen.getByText(mockMfaOnErrorStatus)).toBeVisible();
+
+/**
+ * Inidicates that the `useMfaModalDialog` hook has returned `mfaOnSuccessTriggered` value as true on success
+ */
+const assertMfaOnSuccessTriggered = () => expect(screen.getByText(mockMfaOnSuccessStatus)).toBeVisible();
 
 const assertLinks = () => {
   const faqLink = getFaqLink();
@@ -98,30 +120,28 @@ describe("MfaModalDialogProvider", () => {
 
   it("should render with dialog in a closed state", () => {
     render(
-      <MfaModalDialogProvider
-        getPerson={mockGetPerson}
-        checkOtp={vi.fn()}
-        checkAndSendOtp={vi.fn()}
-        checkAndVerifyOtp={vi.fn()}
-      >
+      <MfaModalDialogProvider getVerificationDetailsAction={vi.fn()} sendOtpAction={vi.fn()} verifyOtpAction={vi.fn()}>
         <TestButton />
       </MfaModalDialogProvider>,
     );
 
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(getRegistrationOtpVerificationDetails).not.toHaveBeenCalled();
+    expect(sendRegistrationOtp).not.toHaveBeenCalled();
+    expect(verifyRegistrationOtp).not.toHaveBeenCalled();
+
+    expect(screen.getByText(mockMfaIncompleteStatus)).toBeVisible();
   });
 
   it("should render dialogs with expected faqLink and helpDisplayPhoneNumber", async () => {
     const user = userEvent.setup();
-    mockGetPerson.mockResolvedValueOnce(mockMatchedPerson);
-    vi.mocked(checkRegistrationOtp).mockResolvedValueOnce(false);
-    vi.mocked(checkAndSendRegistrationOtp).mockResolvedValueOnce({ data: { hasSendAttemptsRemaining: true } });
+    vi.mocked(getRegistrationOtpVerificationDetails).mockResolvedValue(mockOtpVerificationDetails);
+    vi.mocked(sendRegistrationOtp).mockResolvedValue({ data: { hasSendAttemptsRemaining: true } });
     render(
       <MfaModalDialogProvider
-        getPerson={mockGetPerson}
-        checkOtp={checkRegistrationOtp}
-        checkAndSendOtp={checkAndSendRegistrationOtp}
-        checkAndVerifyOtp={vi.fn()}
+        getVerificationDetailsAction={getRegistrationOtpVerificationDetails}
+        sendOtpAction={sendRegistrationOtp}
+        verifyOtpAction={vi.fn()}
       >
         <TestButton />
       </MfaModalDialogProvider>,
@@ -131,39 +151,26 @@ describe("MfaModalDialogProvider", () => {
     await waitFor(() => expect(getDialog("Let's verify it's you")).toBeVisible());
     assertLinks();
 
+    expect(getRegistrationOtpVerificationDetails).toHaveBeenCalled();
+
     await user.click(getSendCodeButton());
     await waitFor(() => expect(getDialog("Enter verification code")).toBeVisible());
     assertLinks();
+
+    expect(sendRegistrationOtp).toHaveBeenCalled();
+    expect(verifyRegistrationOtp).not.toHaveBeenCalled();
+
+    expect(screen.getByText(mockMfaIncompleteStatus)).toBeVisible();
   });
 
-  it("should should call error callback and navigate to error page when getMatchedPerson returns undefined Person", async () => {
+  it("should call error callback and navigate to error page when getRegistrationOtpVerificationDetails returns an error", async () => {
     const user = userEvent.setup();
-    mockGetPerson.mockResolvedValueOnce(undefined);
+    vi.mocked(getRegistrationOtpVerificationDetails).mockRejectedValueOnce(new Error());
     render(
       <MfaModalDialogProvider
-        getPerson={mockGetPerson}
-        checkOtp={vi.fn()}
-        checkAndSendOtp={vi.fn()}
-        checkAndVerifyOtp={vi.fn()}
-      >
-        <TestButton />
-      </MfaModalDialogProvider>,
-    );
-
-    await user.click(getTestButton());
-
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith(systemUnavailableErrorPageUrl));
-  });
-
-  it("should call error callback and navigate to error page when getMatchedPerson returns a Person with null otpVerificationDetails", async () => {
-    const user = userEvent.setup();
-    mockGetPerson.mockResolvedValueOnce({ ...mockMatchedPerson, otpVerificationDetails: null });
-    render(
-      <MfaModalDialogProvider
-        getPerson={mockGetPerson}
-        checkOtp={vi.fn()}
-        checkAndSendOtp={vi.fn()}
-        checkAndVerifyOtp={vi.fn()}
+        getVerificationDetailsAction={getRegistrationOtpVerificationDetails}
+        sendOtpAction={vi.fn()}
+        verifyOtpAction={vi.fn()}
       >
         <TestButton />
       </MfaModalDialogProvider>,
@@ -173,61 +180,72 @@ describe("MfaModalDialogProvider", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
     expect(pushMock).toHaveBeenCalledWith(systemUnavailableErrorPageUrl);
+    expect(getRegistrationOtpVerificationDetails).toHaveBeenCalled();
+    expect(sendRegistrationOtp).not.toHaveBeenCalled();
+    expect(verifyRegistrationOtp).not.toHaveBeenCalled();
+
+    assertMfaOnErrorTriggered();
   });
 
   it("should call success callback if person is already authenticated for the session key", async () => {
     const user = userEvent.setup();
-    mockGetPerson.mockResolvedValueOnce(mockMatchedPerson);
-    vi.mocked(checkRegistrationOtp).mockResolvedValueOnce(true);
+    vi.mocked(getRegistrationOtpVerificationDetails).mockResolvedValue({
+      ...mockOtpVerificationDetails,
+      isAuthenticated: true,
+    });
     render(
       <MfaModalDialogProvider
-        getPerson={mockGetPerson}
-        checkOtp={checkRegistrationOtp}
-        checkAndSendOtp={vi.fn()}
-        checkAndVerifyOtp={vi.fn()}
+        getVerificationDetailsAction={getRegistrationOtpVerificationDetails}
+        sendOtpAction={vi.fn()}
+        verifyOtpAction={vi.fn()}
       >
         <TestButton />
       </MfaModalDialogProvider>,
     );
 
     await user.click(getTestButton());
-
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-
     await waitFor(() => expect(mockSuccessHandler).toHaveBeenCalled());
+
+    expect(getRegistrationOtpVerificationDetails).toHaveBeenCalled();
+    expect(sendRegistrationOtp).not.toHaveBeenCalled();
+    expect(verifyRegistrationOtp).not.toHaveBeenCalled();
+
+    assertMfaOnSuccessTriggered();
   });
 
   it("should open dialog if person is not already authenticated for the session key", async () => {
     const user = userEvent.setup();
-    mockGetPerson.mockResolvedValueOnce(mockMatchedPerson);
-    vi.mocked(checkRegistrationOtp).mockResolvedValueOnce(false);
+    vi.mocked(getRegistrationOtpVerificationDetails).mockResolvedValue(mockOtpVerificationDetails);
     render(
       <MfaModalDialogProvider
-        getPerson={mockGetPerson}
-        checkOtp={checkRegistrationOtp}
-        checkAndSendOtp={vi.fn()}
-        checkAndVerifyOtp={vi.fn()}
+        getVerificationDetailsAction={getRegistrationOtpVerificationDetails}
+        sendOtpAction={vi.fn()}
+        verifyOtpAction={vi.fn()}
       >
         <TestButton />
       </MfaModalDialogProvider>,
     );
 
     await user.click(getTestButton());
-
     await waitFor(() => expect(getDialog("Let's verify it's you")).toBeVisible());
+
+    expect(getRegistrationOtpVerificationDetails).toHaveBeenCalled();
+    expect(sendRegistrationOtp).not.toHaveBeenCalled();
+    expect(verifyRegistrationOtp).not.toHaveBeenCalled();
+
+    expect(screen.getByText("MFA Incomplete")).toBeVisible();
   });
 
-  it("should call error callback and navigate to error page when checkAndSendRegistrationOtp throws an error", async () => {
+  it("should call error callback and navigate to error page when sendRegistrationOtp throws an error", async () => {
     const user = userEvent.setup();
-    mockGetPerson.mockResolvedValueOnce(mockMatchedPerson);
-    vi.mocked(checkRegistrationOtp).mockResolvedValueOnce(false);
-    vi.mocked(checkAndSendRegistrationOtp).mockResolvedValueOnce({ errorCode: "TooManyRequestsError" });
+    vi.mocked(getRegistrationOtpVerificationDetails).mockResolvedValue(mockOtpVerificationDetails);
+    vi.mocked(sendRegistrationOtp).mockResolvedValue({ errorCode: "TooManyRequestsError" });
     render(
       <MfaModalDialogProvider
-        getPerson={mockGetPerson}
-        checkOtp={checkRegistrationOtp}
-        checkAndSendOtp={checkAndSendRegistrationOtp}
-        checkAndVerifyOtp={vi.fn()}
+        getVerificationDetailsAction={getRegistrationOtpVerificationDetails}
+        sendOtpAction={sendRegistrationOtp}
+        verifyOtpAction={vi.fn()}
       >
         <TestButton />
       </MfaModalDialogProvider>,
@@ -239,25 +257,28 @@ describe("MfaModalDialogProvider", () => {
     await user.click(screen.getByRole("button", { name: "Send code" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
-    expect(pushMock).toHaveBeenCalledWith(systemUnavailableErrorPageUrl);
+    expect(pushMock).toHaveBeenCalledWith(getRegistrationErrorPageUrl({ page: "/system-unavailable" }));
+    expect(getRegistrationOtpVerificationDetails).toHaveBeenCalled();
+    expect(sendRegistrationOtp).toHaveBeenCalled();
+    expect(verifyRegistrationOtp).not.toHaveBeenCalled();
+
+    assertMfaOnErrorTriggered();
   });
 
-  it("should call error callback and navigate to error page when checkAndVerifyRegistrationOtp throws an error", async () => {
+  it("should call error callback and navigate to error page when verifyRegistrationOtp throws an error", async () => {
     // user-event adds a delay between some subsequent inputs.
     // When using fake timers it is necessary to set this option
     // to your test runner's time advancement function.
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    mockGetPerson.mockResolvedValueOnce(mockMatchedPerson);
-    vi.mocked(checkRegistrationOtp).mockResolvedValueOnce(false);
-    vi.mocked(checkAndSendRegistrationOtp).mockResolvedValueOnce({ data: { hasSendAttemptsRemaining: true } });
-    vi.mocked(checkAndVerifyRegistrationOtp).mockResolvedValueOnce({ errorCode: "TooManyRequestsError" });
+    vi.mocked(getRegistrationOtpVerificationDetails).mockResolvedValue(mockOtpVerificationDetails);
+    vi.mocked(sendRegistrationOtp).mockResolvedValue({ data: { hasSendAttemptsRemaining: true } });
+    vi.mocked(verifyRegistrationOtp).mockResolvedValue({ errorCode: "TooManyRequestsError" });
     render(
       <MfaModalDialogProvider
-        getPerson={mockGetPerson}
-        checkOtp={checkRegistrationOtp}
-        checkAndSendOtp={checkAndSendRegistrationOtp}
-        checkAndVerifyOtp={checkAndVerifyRegistrationOtp}
+        getVerificationDetailsAction={getRegistrationOtpVerificationDetails}
+        sendOtpAction={sendRegistrationOtp}
+        verifyOtpAction={verifyRegistrationOtp}
       >
         <TestButton />
       </MfaModalDialogProvider>,
@@ -281,8 +302,13 @@ describe("MfaModalDialogProvider", () => {
     act(() => {
       vi.advanceTimersByTime(1500); // Matches OTP_VERIFY_CLOSURE_DELAY const value in @racwa/mfa package
     });
-
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith(systemUnavailableErrorPageUrl));
+
+    expect(getRegistrationOtpVerificationDetails).toHaveBeenCalled();
+    expect(sendRegistrationOtp).toHaveBeenCalled();
+    expect(verifyRegistrationOtp).toHaveBeenCalled();
+
+    assertMfaOnErrorTriggered();
   });
 
   it("should call success callback when dialog is closed on successful completion", async () => {
@@ -291,16 +317,14 @@ describe("MfaModalDialogProvider", () => {
     // to your test runner's time advancement function.
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    mockGetPerson.mockResolvedValueOnce(mockMatchedPerson);
-    vi.mocked(checkRegistrationOtp).mockResolvedValueOnce(false);
-    vi.mocked(checkAndSendRegistrationOtp).mockResolvedValueOnce({ data: { hasSendAttemptsRemaining: true } });
-    vi.mocked(checkAndVerifyRegistrationOtp).mockResolvedValueOnce({ data: { isVerified: true } });
+    vi.mocked(getRegistrationOtpVerificationDetails).mockResolvedValue(mockOtpVerificationDetails);
+    vi.mocked(sendRegistrationOtp).mockResolvedValue({ data: { hasSendAttemptsRemaining: true } });
+    vi.mocked(verifyRegistrationOtp).mockResolvedValue({ data: { isVerified: true } });
     render(
       <MfaModalDialogProvider
-        getPerson={mockGetPerson}
-        checkOtp={checkRegistrationOtp}
-        checkAndSendOtp={checkAndSendRegistrationOtp}
-        checkAndVerifyOtp={checkAndVerifyRegistrationOtp}
+        getVerificationDetailsAction={getRegistrationOtpVerificationDetails}
+        sendOtpAction={sendRegistrationOtp}
+        verifyOtpAction={verifyRegistrationOtp}
       >
         <TestButton />
       </MfaModalDialogProvider>,
@@ -324,7 +348,12 @@ describe("MfaModalDialogProvider", () => {
     act(() => {
       vi.advanceTimersByTime(1500); // Matches OTP_VERIFY_CLOSURE_DELAY const value in @racwa/mfa package
     });
-
     await waitFor(() => expect(mockSuccessHandler).toHaveBeenCalled());
+
+    expect(getRegistrationOtpVerificationDetails).toHaveBeenCalled();
+    expect(sendRegistrationOtp).toHaveBeenCalled();
+    expect(verifyRegistrationOtp).toHaveBeenCalled();
+
+    assertMfaOnSuccessTriggered();
   });
 });

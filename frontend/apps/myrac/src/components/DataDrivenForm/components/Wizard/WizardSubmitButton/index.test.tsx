@@ -37,12 +37,12 @@ vi.mock("#graphql/mfa/getOtpVerificationDetails", () => ({
   getOtpVerificationDetails: vi.fn(),
 }));
 
-vi.mock("#graphql/mfa/checkAndSendOtp", () => ({
-  checkAndSendOtp: vi.fn(),
+vi.mock("#graphql/mfa/sendOtp", () => ({
+  sendOtp: vi.fn(),
 }));
 
-vi.mock("#graphql/mfa/checkAndVerifyOtp", () => ({
-  checkAndVerifyOtp: vi.fn(),
+vi.mock("#graphql/mfa/verifyOtp", () => ({
+  verifyOtp: vi.fn(),
 }));
 
 const testChangeableComponent = {

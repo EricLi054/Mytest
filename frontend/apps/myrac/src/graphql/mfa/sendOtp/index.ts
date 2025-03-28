@@ -10,7 +10,7 @@ import { getAccessToken } from "#utils/session/getAccessToken";
 import { getCrmId } from "#utils/session/getCrmId";
 import { graphql } from "gql.tada";
 
-import type { CheckAndSendOtpResponse, OtpChannelValue } from "@racwa/mfa/types";
+import type { OtpChannelValue, SendOtpResponse } from "@racwa/mfa/types";
 import { execute } from "@racwa/gql";
 
 import { SendOtpResponseSchema } from "./schema";
@@ -34,7 +34,7 @@ const query = graphql(`
   }
 `);
 
-export const sendOtp = async (key: string, channel: OtpChannelValue): Promise<CheckAndSendOtpResponse> => {
+export const sendOtp = async (key: string, channel: OtpChannelValue): Promise<SendOtpResponse> => {
   let crmId: string | undefined;
   const tracer = trace.getTracer("default");
   const span = tracer.startSpan("sendOtp-span");

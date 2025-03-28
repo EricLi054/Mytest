@@ -48,9 +48,8 @@ export async function createSessionAction(_: unknown, formData: FormData) {
     sameSite: "strict",
   });
 
-  span.end();
-
   log("Navigating to member match", sessionId);
+  span.end();
   return redirect(getRegistrationPageUrl({ page: "/match" }));
 }
 

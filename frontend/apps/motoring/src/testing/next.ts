@@ -1,5 +1,6 @@
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import type { ReadonlyURLSearchParams } from "next/navigation";
 import { vi } from "vitest";
 
 export const mockAppRouterInstance = (props: Partial<AppRouterInstance> = {}) =>
@@ -25,3 +26,21 @@ export const mockReadonlyRequestCookies = (props: Omit<Partial<ReadonlyRequestCo
     toString: vi.fn(),
     ...props,
   }) satisfies ReadonlyRequestCookies;
+
+export const mockReadonlyURLSearchParams = (props: Omit<Partial<ReadonlyURLSearchParams>, "toString"> = {}) =>
+  ({
+    size: 0,
+    get: () => null,
+    append: vi.fn(),
+    delete: vi.fn(),
+    set: vi.fn(),
+    sort: vi.fn(),
+    getAll: vi.fn(),
+    has: vi.fn(),
+    forEach: vi.fn(),
+    entries: vi.fn(),
+    keys: vi.fn(),
+    values: vi.fn(),
+    [Symbol.iterator]: vi.fn(),
+    ...props,
+  }) satisfies ReadonlyURLSearchParams;

@@ -1,18 +1,18 @@
+import { useActionState } from "react";
 import { render, screen } from "@testing-library/react";
-import { mockConfirmVehicleContentfulData } from "#mocks/mockContentful";
-import { describe, expect, it, vi } from "vitest";
+import { mockConfirmVehicleContentfulData } from "#mocks/contentful";
+import { useFormStatus } from "react-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ConfirmVehicleProps } from "./container";
 import { ConfirmVehicleContainer } from "./container";
 
-// Imported server action in form.tsx also imports server-only code
 vi.mock("server-only", () => ({}));
 
 vi.mock("react-dom", async () => {
   const actual = await vi.importActual("react-dom");
   return {
     ...actual,
-    useFormStatus: vi.fn().mockReturnValue({ pending: false }),
+    useFormStatus: vi.fn(),
   };
 });
 
@@ -20,26 +20,31 @@ vi.mock("react", async () => {
   const actual = await vi.importActual("react");
   return {
     ...actual,
-    useActionState: vi.fn().mockReturnValue([{}, vi.fn(), false]),
+    useActionState: vi.fn(),
   };
 });
 
-const mockProps = {
-  vehicleCardInfo: {
-    title: "2021 TOYOTA",
-    subtitle: "CAMRY SEDAN LE",
-    vehicleType: "CAR",
-    isOverweightOrOversize: false,
-    registration: "ABC123",
-    colour: "BLUE",
-  },
-  contentfulData: mockConfirmVehicleContentfulData,
-  confirmVehicleAction: vi.fn(),
-} satisfies ConfirmVehicleProps;
-
 describe("ConfirmVehicleContainer", () => {
+  beforeEach(() => {
+    vi.mocked(useActionState).mockReturnValue([{}, vi.fn(), false]);
+    vi.mocked(useFormStatus).mockReturnValue({ pending: false, data: null, method: null, action: null });
+  });
+
   it("should be able to render", () => {
-    render(<ConfirmVehicleContainer {...mockProps} />);
+    render(
+      <ConfirmVehicleContainer
+        confirmVehicleAction={vi.fn()}
+        vehicleCardInfo={{
+          title: "2021 TOYOTA",
+          subtitle: "CAMRY SEDAN LE",
+          vehicleType: "CAR",
+          isOverweightOrOversize: false,
+          registration: "ABC123",
+          colour: "BLUE",
+        }}
+        contentfulData={mockConfirmVehicleContentfulData}
+      />,
+    );
 
     expect(screen.getByText("Confirm this is your vehicle")).toBeVisible();
     expect(screen.getByText("2021 TOYOTA")).toBeVisible();

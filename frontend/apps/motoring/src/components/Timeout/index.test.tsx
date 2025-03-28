@@ -1,7 +1,7 @@
 import { useRouter } from "next/navigation";
 import { render, waitFor } from "@testing-library/react";
 import { mockAppRouterInstance } from "#testing/next";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import Timeout from ".";
 
@@ -12,10 +12,6 @@ const sessionTimeoutUrl = "/session-timeout";
 const setTimeoutDelayMax = 0x7fffffff;
 
 describe("Timeout", () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
-
   it("should navigate to sessionTimeoutUrl after (sessionTtl + grace period) milliseconds", async () => {
     const sessionTtl = 1_000; // 1 second
     const mockRouter = mockAppRouterInstance();

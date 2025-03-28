@@ -1,18 +1,14 @@
-import NotFoundPageContent from "#components/Error/NotFoundPageContent";
-import Footer from "#components/Footer";
-import Header from "#components/Header";
-import { getNotFoundPageData } from "#graphql/pages/getNotFoundPageData";
+"use client";
 
-// TODO: Bring this page content into code
-// Shall we just have the header and footer ID's as constants to reference here?
-// That could also help with putting those components into the layout file rather than them being build with the page
-export default async function NotFound() {
-  const { title, navigation, footer } = await getNotFoundPageData();
+import { Button } from "@mui/material";
+import { GenericErrorComponent } from "#components/Error/GenericErrorComponent";
+
+export default function NotFound() {
   return (
-    <>
-      <Header id={navigation.sys.id} title={title} />
-      <NotFoundPageContent />
-      <Footer id={footer.sys.id} />
-    </>
+    <GenericErrorComponent heading="Uh oh!" subHeading="Sorry, we can't find that page">
+      <Button variant="contained" color="primary" href="/myRAC" size="medium">
+        Back to myRAC
+      </Button>
+    </GenericErrorComponent>
   );
 }

@@ -20,7 +20,7 @@ const GraphQLResponseSchema = z.object({
 export const ensureAuthenticatedResponse = (response: z.infer<typeof GraphQLResponseSchema>) => {
   if (response.errors) {
     const error = response.errors[0];
-    if (error?.extensions?.code === "AUTH_NOT_AUTHENTICATED") {
+    if (error?.extensions?.code === "AUTH_NOT_AUTHENTICATED" || error?.message === "Unauthenticated") {
       redirect("/signIn");
     }
   }

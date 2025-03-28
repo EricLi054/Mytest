@@ -4,7 +4,7 @@ import type { PersonSchema } from "#graphql/person/queries/schema";
 import type { ContentfulLinkSchema } from "#graphql/sharedSchema/linkSchema";
 import type { JSX } from "react";
 import type { z } from "zod";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Grid2 as Grid, Stack } from "@mui/material";
 import { logNavClick } from "#utils/analyticsTagging";
@@ -27,17 +27,6 @@ type InternalHeaderProps = {
 export default function InternalHeader({ headerData, breadcrumbs, person }: InternalHeaderProps) {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileUserMenuOpen, setMobileUserMenuOpen] = useState(false);
-
-  // This useEffect is used to fire the window scroll event when the menu is opened
-  // This allows Poppers to recalculate their position
-  useEffect(() => {
-    setTimeout(() => {
-      window.scroll({
-        top: window.scrollY > 0 ? window.scrollY - 1 : window.scrollY + 1,
-        left: 0,
-      });
-    }, 300);
-  }, [mobileUserMenuOpen, mobileSearchOpen]);
 
   return (
     <StyledResponsiveHeader

@@ -5,6 +5,7 @@
     "build": {
       "dependsOn": ["^build"],
       "env": [
+        "CONTAINER_APP_ENV",
         "GRAPHQL_ENDPOINT",
         "AZURE_CLIENT_ID",
         "AZURE_MANAGEMENT_APPLICATION_ID",

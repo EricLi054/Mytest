@@ -10,7 +10,7 @@ import { getAccessToken } from "#utils/session/getAccessToken";
 import { getCrmId } from "#utils/session/getCrmId";
 import { graphql } from "gql.tada";
 
-import type { CheckAndVerifyOtpResponse } from "@racwa/mfa/types";
+import type { VerifyOtpResponse } from "@racwa/mfa/types";
 import { execute } from "@racwa/gql";
 
 import { VerifyOtpResponseSchema } from "./schema";
@@ -34,7 +34,7 @@ const query = graphql(`
   }
 `);
 
-export const verifyOtp = async (key: string, code: string): Promise<CheckAndVerifyOtpResponse> => {
+export const verifyOtp = async (key: string, code: string): Promise<VerifyOtpResponse> => {
   let crmId: string | undefined;
   const tracer = trace.getTracer("default");
   const span = tracer.startSpan("verifyOtp-span");

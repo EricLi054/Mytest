@@ -81,6 +81,11 @@ const maskedPersonResponse: z.infer<typeof RawPersonSchema> = {
   postalAddress: basicAddress,
 };
 
+const unauthenticatedResponse = {
+  errors: [{ message: "Unauthenticated", name: "error" }],
+  data: null,
+};
+
 describe("Person GraphQL", () => {
   it("should return an cached person when found", async () => {
     vi.mocked(getPersonCache).mockResolvedValueOnce(personResponse);
@@ -178,5 +183,14 @@ describe("Person GraphQL", () => {
     vi.mocked(getServerSession).mockReturnValue(Promise.resolve("12345"));
 
     await expect(getPerson()).rejects.toThrow("No CRM ID found.");
+  });
+
+  it("should redirect to login page when getPerson returns an unauthenticated error response", async () => {
+    vi.mocked(getPersonCache).mockResolvedValueOnce(null);
+    vi.mocked(getCrmId).mockResolvedValueOnce("123");
+    vi.mocked(getServerSession).mockReturnValue(Promise.resolve("12345"));
+    vi.mocked(execute).mockReturnValueOnce(Promise.resolve(unauthenticatedResponse));
+
+    await expect(getPerson()).rejects.toThrow("NEXT_REDIRECT");
   });
 });

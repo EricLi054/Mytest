@@ -1,0 +1,106 @@
+"use server";
+
+import { headers } from "next/headers";
+import { trace } from "@opentelemetry/api";
+import { serverEnv } from "#env/server";
+import { getAccessToken } from "#utils/Authentication";
+import { annotatedError, annotatedLog } from "#utils/logging";
+import { getNpeFeatureHeaders } from "#utils/npe";
+import { graphql } from "gql.tada";
+
+import type { OtpChannelValue, SendOtpResponse } from "@racwa/mfa/types";
+import { execute } from "@racwa/gql";
+
+import { getCrmId } from "../../utils/mfa";
+import { schema } from "./schema";
+
+const query = graphql(`
+  mutation SendRegistrationOtp($input: SendRegistrationOtpInput!) {
+    sendRegistrationOtp(input: $input) {
+      sendOtpResponse {
+        hasSendAttemptsRemaining
+      }
+      errors {
+        ... on TooManyRequestsError {
+          __typename
+        }
+        ... on NotFoundError {
+          __typename
+        }
+        ... on InternalServerError {
+          __typename
+        }
+      }
+    }
+  }
+`);
+
+export const sendRegistrationOtp = async (key: string, channel: OtpChannelValue): Promise<SendOtpResponse> => {
+  let crmId: string | undefined;
+
+  const tracer = trace.getTracer("default");
+  const span = tracer.startSpan("check-registration-otp-gql-span");
+  const correlationId = crypto.randomUUID();
+
+  try {
+    // await ensureServerSession(); // TODO - DED-2331 - myRAC does this, but it is always returning null session here and in the root layout
+    crmId = await getCrmId();
+    const token = await getAccessToken();
+    const headerStore = await headers();
+    const npeFeatureHeaders = await getNpeFeatureHeaders(correlationId);
+
+    annotatedLog(
+      "sendRegistrationOtp",
+      `Starting to send registration OTP with CorrelationID [${correlationId}]`,
+      key,
+      crmId,
+    );
+
+    const rawResponse = await execute({
+      endpoint: serverEnv().GRAPHQL_ENDPOINT,
+      token,
+      query,
+      sourceSystem: "identity",
+      variables: { input: { key, crmId, channel } },
+      headers: {
+        CorrelationId: correlationId,
+        // TODO - DED-1296 - What happens if User-Agent is undefined? RACI MFA OTP Service will error on verify. Should Person subgraph MFA Service throw exception?
+        "User-Agent": headerStore.get("User-Agent") ?? "",
+        ...npeFeatureHeaders,
+      },
+    });
+
+    if (rawResponse.errors) {
+      throw new Error("Unhandled Exception");
+    }
+
+    const validatedResponse = schema.parse(rawResponse.data);
+
+    if (validatedResponse.sendRegistrationOtp.sendOtpResponse) {
+      return { data: validatedResponse.sendRegistrationOtp.sendOtpResponse };
+    }
+
+    if (validatedResponse.sendRegistrationOtp.errors && validatedResponse.sendRegistrationOtp.errors.length === 1) {
+      const errorCode = validatedResponse.sendRegistrationOtp.errors[0]?.__typename;
+
+      if (errorCode === "TooManyRequestsError") {
+        return {
+          errorCode,
+        };
+      }
+    }
+
+    throw new Error("Unhandled Exception");
+  } catch (error) {
+    annotatedError(
+      "sendRegistrationOtp",
+      `Failed to send registration OTP with CorrelationID [${correlationId}]`,
+      error,
+      key,
+      crmId,
+    );
+    throw error;
+  } finally {
+    span.end();
+  }
+};

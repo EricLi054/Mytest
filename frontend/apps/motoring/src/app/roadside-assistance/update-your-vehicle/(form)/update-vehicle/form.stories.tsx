@@ -1,6 +1,6 @@
 import type { SubmissionResult } from "@conform-to/react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { mockUpdateVehicleContentfulData } from "#mocks/mockContentful";
+import { mockUpdateVehicleContentfulData } from "#mocks/contentful";
 import StorybookStepperLayout from "#storybook/StorybookerStepperLayout";
 
 import type { GetVehicleByRegoAction } from "./actions";

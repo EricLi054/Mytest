@@ -2,10 +2,10 @@ import type { Mock } from "vitest";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { deleteSessionCookie } from "../../session/actions";
+import { deleteSessionCookie } from "./actions";
 import DeleteCookie from "./DeleteCookie";
 
-vi.mock("../../session/actions", () => ({
+vi.mock("./actions", () => ({
   deleteSessionCookie: vi.fn(),
 }));
 

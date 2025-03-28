@@ -3,11 +3,11 @@ import { redirect } from "next/navigation";
 import SessionBuilder from "#testing/builders/SessionBuilder";
 import { getAccessToken } from "#utils/Authentication";
 import { getRegistrationSession, updateRegistrationSession } from "#utils/session";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { execute } from "@racwa/gql";
 
-import type { OtpVerificationDetails, Person, PersonMatchError } from "./types";
+import type { Person, PersonMatchError } from "./types";
 import { matchFormAction } from "./actions";
 import { LapsedMembershipStatus } from "./types";
 
@@ -34,9 +34,12 @@ vi.mock("#utils/session", async () => {
 });
 
 const mockSessionId = "123456789-987654321";
-const mockMfaSessionKey = `my-rac-account-registration-${mockSessionId}`;
 
-function getMockData(mfaSessionKey: string) {
+vi.mock("#utils/Authentication");
+
+const reCaptchaToken = "reCaptchaToken";
+
+function getMockData() {
   return {
     data: {
       match: {
@@ -45,14 +48,7 @@ function getMockData(mfaSessionKey: string) {
           racId: "00000001",
           firstName: "John",
           mobilePhone: "0400000000",
-
           membershipType: "Member",
-          otpVerificationDetails: {
-            sessionKey: mfaSessionKey,
-            isAuthenticated: false,
-            isMobile: true,
-            phoneNumberSuffix: "000",
-          },
         },
         errors: undefined,
       },
@@ -80,19 +76,52 @@ const setupMockSession = (session?: RegistrationSession) => {
   vi.mocked(getRegistrationSession).mockResolvedValue(session ?? getSession());
 };
 
-const setupMockCrypto = () => {
-  vi.spyOn(crypto, "randomUUID").mockReturnValue(mockSessionId);
-};
-
 describe("matchFormAction", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, score: 1 }),
+      }),
+    );
+  });
+
+  it("should reject requests when reCAPTCHA fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: false, score: 1 }),
+      }),
+    );
+    setupMockSession();
+    await matchFormAction(undefined, getFormData(), reCaptchaToken);
+
+    expect(redirect).toHaveBeenCalledWith("/register/error/system-unavailable");
+  });
+
+  it("should reject requests when reCAPTCHA score is below threshold", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, score: 0.2 }),
+      }),
+    );
+    setupMockSession();
+    await matchFormAction(undefined, getFormData(), reCaptchaToken);
+
+    expect(redirect).toHaveBeenCalledWith("/register/error/system-unavailable");
+  });
+
   it("should match a member", async () => {
-    const mockData = getMockData(mockMfaSessionKey);
-    setupMockCrypto();
+    const mockData = getMockData();
     setupMockAccessToken();
     setupMockSession();
     vi.mocked(execute).mockResolvedValue(mockData);
 
-    const result = await matchFormAction(undefined, getFormData());
+    const result = await matchFormAction(undefined, getFormData(), reCaptchaToken);
 
     expect(result).toBeDefined();
     expect(result?.status).toBe("success");
@@ -102,9 +131,6 @@ describe("matchFormAction", () => {
         session: expect.objectContaining({
           person: expect.objectContaining({
             personId: mockData.data.match.matchedPerson.personId,
-            otpVerificationDetails: expect.objectContaining({
-              sessionKey: mockMfaSessionKey,
-            }) as Partial<OtpVerificationDetails>,
           }) as Partial<Person>,
           steps: expect.objectContaining({
             match: expect.anything() as Partial<RegistrationSession["steps"]["match"]>,
@@ -115,28 +141,28 @@ describe("matchFormAction", () => {
   });
 
   it("should handle a No Match attempt", async () => {
+    const noMatchErrorType = "NoMatchError";
     const mockData = {
       data: {
         match: {
           matchedPerson: null,
           errors: [
             {
-              type: "NoMatchError",
+              type: noMatchErrorType,
             },
           ],
         },
       },
     };
-    setupMockCrypto();
     setupMockAccessToken();
     setupMockSession();
     vi.mocked(execute).mockResolvedValue(mockData);
 
-    const result = await matchFormAction(undefined, getFormData());
+    const result = await matchFormAction(undefined, getFormData(), reCaptchaToken);
 
     expect(result).toBeDefined();
     expect(result?.status).toBe("error");
-    expect(result?.error).toStrictEqual({ "": ["NoMatchError" satisfies PersonMatchError] });
+    expect(result?.error).toStrictEqual({ "": [noMatchErrorType satisfies PersonMatchError] });
     expect(updateRegistrationSession).toHaveBeenCalledWith(
       expect.objectContaining({
         session: expect.objectContaining({ incorrectMatchAttempts: 1 }) as Partial<RegistrationSession>,
@@ -145,28 +171,28 @@ describe("matchFormAction", () => {
   });
 
   it("should handle a Duplicate Match attempt", async () => {
+    const duplicateMatchErrorType = "DuplicateMatchError";
     const mockData = {
       data: {
         match: {
           matchedPerson: null,
           errors: [
             {
-              type: "DuplicateMatchError",
+              type: duplicateMatchErrorType,
             },
           ],
         },
       },
     };
-    setupMockCrypto();
     setupMockAccessToken();
     setupMockSession();
     vi.mocked(execute).mockResolvedValue(mockData);
 
-    const result = await matchFormAction(undefined, getFormData());
+    const result = await matchFormAction(undefined, getFormData(), reCaptchaToken);
 
     expect(result).toBeDefined();
     expect(result?.status).toBe("error");
-    expect(result?.error).toStrictEqual({ "": ["DuplicateMatchError" satisfies PersonMatchError] });
+    expect(result?.error).toStrictEqual({ "": [duplicateMatchErrorType satisfies PersonMatchError] });
     expect(updateRegistrationSession).toHaveBeenCalledWith(
       expect.objectContaining({
         session: expect.objectContaining({ incorrectMatchAttempts: 1 }) as Partial<RegistrationSession>,
@@ -186,39 +212,26 @@ describe("matchFormAction", () => {
           },
         },
       ],
-      data: {
-        match: {
-          matchedPerson: null,
-          errors: [],
-        },
-      },
+      data: null,
     };
-    setupMockCrypto();
     setupMockAccessToken();
     setupMockSession();
     vi.mocked(execute).mockResolvedValue(mockData);
 
-    await matchFormAction(undefined, getFormData());
+    await matchFormAction(undefined, getFormData(), reCaptchaToken);
 
     expect(updateRegistrationSession).not.toHaveBeenCalled();
     expect(redirect).toHaveBeenCalledWith("/register/error/system-unavailable");
   });
 
-  it("should reject requests when too many attempts have already been made", async () => {
+  it("should redirect to cant-find-you error page when too many attempts have already been made", async () => {
     const session = getSession();
     session.incorrectMatchAttempts = 10;
-    const mockData = {
-      data: {
-        match: undefined,
-      },
-    };
-    setupMockCrypto();
-    setupMockAccessToken();
     setupMockSession(session);
-    vi.mocked(execute).mockResolvedValue(mockData);
 
-    await matchFormAction(undefined, getFormData());
+    await matchFormAction(undefined, getFormData(), reCaptchaToken);
 
+    expect(execute).not.toHaveBeenCalled();
     expect(updateRegistrationSession).not.toHaveBeenCalled();
     expect(redirect).toHaveBeenCalledWith("/register/error/cant-find-you");
   });
@@ -234,12 +247,11 @@ describe("matchFormAction", () => {
         },
       },
     };
-    setupMockCrypto();
     setupMockAccessToken();
     setupMockSession(session);
     vi.mocked(execute).mockResolvedValue(mockData);
 
-    await matchFormAction(undefined, getFormData());
+    await matchFormAction(undefined, getFormData(), reCaptchaToken);
 
     expect(redirect).toHaveBeenCalledWith("/register/error/cant-find-you");
     expect(updateRegistrationSession).toHaveBeenCalledWith(
@@ -253,25 +265,40 @@ describe("matchFormAction", () => {
     const consoleMock = vi.spyOn(console, "log");
     setupMockSession();
 
-    const result = await matchFormAction(undefined, new FormData());
+    const result = await matchFormAction(undefined, new FormData(), reCaptchaToken);
 
     expect(result).toBeDefined();
     expect(result?.status).toBe("error");
     expect(consoleMock).toHaveBeenCalledWith(expect.stringContaining("Form data invalid"));
   });
 
-  it("should reject to lapsed-membership error page when membership status is non member", async () => {
+  it("should redirect to lapsed-membership error page when membership status is non member", async () => {
     const session = getSession();
-    const mockData = getMockData(mockMfaSessionKey);
+    const mockData = getMockData();
     mockData.data.match.matchedPerson.membershipType = LapsedMembershipStatus;
-
-    setupMockAccessToken();
     setupMockSession(session);
     vi.mocked(execute).mockResolvedValue(mockData);
 
-    await matchFormAction(undefined, getFormData());
+    await matchFormAction(undefined, getFormData(), reCaptchaToken);
 
-    expect(updateRegistrationSession).not.toHaveBeenCalled();
+    expect(updateRegistrationSession).toHaveBeenCalledWith({
+      session: expect.objectContaining({ person: mockData.data.match.matchedPerson }) as Partial<RegistrationSession>,
+    });
     expect(redirect).toHaveBeenCalledWith("/register/error/lapsed-membership");
+  });
+
+  it("should redirect to already-matched error page when a person already exists on the session", async () => {
+    const mockData = getMockData();
+    const session = new SessionBuilder()
+      .withSessionId(mockSessionId)
+      .withPerson(mockData.data.match.matchedPerson)
+      .build();
+    setupMockSession(session);
+
+    await matchFormAction(undefined, getFormData(), reCaptchaToken);
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(updateRegistrationSession).not.toHaveBeenCalled();
+    expect(redirect).toHaveBeenCalledWith("/register/error/already-matched");
   });
 });

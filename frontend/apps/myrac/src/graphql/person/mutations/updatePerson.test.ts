@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { getServerSession } from "next-auth";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { execute } from "@racwa/gql";
 
@@ -39,6 +40,10 @@ const mockPerson = {
 };
 
 describe("UpdatePerson Graphql", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("should return true for successful update", async () => {
     const mockRequestResponse = {
       updatePerson: { person: mockPerson },
@@ -48,7 +53,7 @@ describe("UpdatePerson Graphql", () => {
     vi.mocked(getServerSession).mockReturnValue(Promise.resolve("12345"));
     vi.mocked(execute).mockReturnValueOnce(Promise.resolve({ data: mockRequestResponse }));
 
-    expect(await updatePerson({ person: { request: { firstName: "John" } } })).toEqual(true);
+    expect(await updatePerson({ person: { request: { surname: "Smith" } } })).toEqual(true);
   });
 
   it("should throw an error on successful response if the caching doesn't work", async () => {
@@ -61,7 +66,7 @@ describe("UpdatePerson Graphql", () => {
     vi.mocked(getServerSession).mockReturnValue(Promise.resolve("12345"));
     vi.mocked(execute).mockReturnValueOnce(Promise.resolve({ data: mockRequestResponse }));
 
-    await expect(updatePerson({ person: { request: { firstName: "John" } } })).rejects.toThrow(
+    await expect(updatePerson({ person: { request: { surname: "Smith" } } })).rejects.toThrow(
       "Could not update the Person Cache.",
     );
   });
@@ -72,6 +77,31 @@ describe("UpdatePerson Graphql", () => {
       Promise.resolve({ data: { updatePerson: null }, errors: [{ name: "Error", message: "Couldn't update" }] }),
     );
 
-    expect(await updatePerson({ person: { request: { firstName: "John" } } })).toEqual(false);
+    expect(await updatePerson({ person: { request: { surname: "Smith" } } })).toEqual(false);
+  });
+
+  it("should not update person firstName", async () => {
+    const mockRequestResponse = {
+      updatePerson: { person: mockPerson },
+    };
+
+    vi.mocked(upsertPersonCache).mockResolvedValueOnce(true);
+    vi.mocked(getServerSession).mockReturnValue(Promise.resolve("12345"));
+    vi.mocked(execute).mockReturnValueOnce(Promise.resolve({ data: mockRequestResponse }));
+
+    const variables = { person: { request: { firstName: "Jonty", surname: "Smith" } } };
+    await updatePerson(variables);
+
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          person: expect.objectContaining({
+            request: expect.not.objectContaining({
+              firstName: expect.any(String),
+            }),
+          }),
+        }),
+      }),
+    );
   });
 });

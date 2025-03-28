@@ -76,12 +76,25 @@ export const updatePerson = async (variables: VariablesOf<typeof query>) => {
 
     log("updatePerson", "Starting to update person", correlationId, crmId);
 
+    const { firstName: _firstName, ...filteredRequest } = variables.person.request;
+
+    const allowedUpdateVariables = {
+      person: {
+        request: {
+          ...filteredRequest,
+          postalAddress: {
+            ...filteredRequest.postalAddress,
+          },
+        },
+      },
+    };
+
     const rawResponse = await execute({
       endpoint: serverEnv().GRAPHQL_ENDPOINT,
       token,
       query,
       sourceSystem: "myRAC",
-      variables,
+      variables: allowedUpdateVariables,
       headers: { CorrelationID: correlationId },
     });
 

@@ -3,6 +3,14 @@ import { getAddressList, validateAddress } from "#graphql/address";
 
 import type { AddressInputValidatedValue, ParsedAddressValue } from "./schema";
 
+type SearchAddressFunctionResponse = { error: boolean; options: { value: string; label: string }[] };
+export type SearchAddressFunction = (inputtedAddress: string) => Promise<SearchAddressFunctionResponse>;
+
+type ValidateSelectedAddressFunctionResponse = z.infer<typeof AddressInputValidatedValue> | null;
+export type ValidateSelectedAddressFunction = (
+  toValidate: z.infer<typeof ParsedAddressValue>,
+) => Promise<ValidateSelectedAddressFunctionResponse>;
+
 export const searchAddress = async (inputtedAddress: string) => {
   try {
     const data = await getAddressList(inputtedAddress);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect } from "react";
 import { getFormProps, getInputProps, useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod";
 import { Box, Button, FormControl, FormHelperText, Typography } from "@mui/material";
@@ -10,6 +10,7 @@ import CancelLink from "#components/CancelLink";
 import Container from "#components/Container";
 import { RegistrationPhoneLink } from "#components/PhoneLink";
 import RacLogo from "#components/RacLogo/index";
+import ReCaptcha, { getReCaptchaToken } from "#components/ReCaptcha";
 import { logCustomEvent, logFieldTouched } from "#utils/analyticsTagging";
 import {
   DATE_STRING_FORMAT,
@@ -40,9 +41,10 @@ const MAX_NAME_LENGTH = 15;
 
 export type MatchFormProps = {
   formAction: MatchFormAction;
+  reCaptchaSiteKey: string;
 };
 
-export default function MatchForm({ formAction }: MatchFormProps) {
+export default function MatchForm({ formAction, reCaptchaSiteKey }: MatchFormProps) {
   const firstNameInputId = "first-name-input";
   const lastNameInputId = "last-name-input";
   const dateOfBirthInputId = "date-of-birth-input";
@@ -51,9 +53,14 @@ export default function MatchForm({ formAction }: MatchFormProps) {
   const policyNumberInputId = "policy-number-input";
   const defaultIdentificationMethod = IdentificationMethod.Mobile;
 
-  const { openMfaModal } = useMfaModalDialog();
-  const [showAdb2cLoadingModal, setShowAdb2cLoadingModal] = useState<boolean>(false);
-  const [lastResult, submitAction, isPending] = useActionState(formAction, undefined);
+  const onSubmit = async (_: unknown, formData: FormData) => {
+    const token = await getReCaptchaToken(reCaptchaSiteKey);
+    return await formAction(_, formData, token);
+  };
+
+  const { openMfaModal, mfaOnErrorTriggered, mfaOnSuccessTriggered } = useMfaModalDialog();
+  const [lastResult, submitAction, isPending] = useActionState(onSubmit, undefined);
+
   const [form, fields] = useForm({
     lastResult,
     onValidate: ({ formData }) => {
@@ -75,14 +82,12 @@ export default function MatchForm({ formAction }: MatchFormProps) {
      * TODO - DED-1296 - Should this be moved up to the page and passed into the form to make it easier to test etc?
      */
     const signInWithAdb2c = async () => {
-      setShowAdb2cLoadingModal(true);
       await signIn("azure-ad-b2c", { callbackUrl: "/identify/register/link-member" });
     };
 
     // We only get a "success" when a member match is found, so show
     // a loading modal while we are displaying the MFA modal dialog and
     // navigating out to ADB2C on successful completion of MFA verification.
-    // TODO - DED-1296 - Should we add an OR check to see if member is in the session (which indicates match success) so that the MFA can be opened without matching again?
     if (lastResult?.status === "success") {
       const firstName =
         typeof lastResult.initialValue?.firstName === "string" ? lastResult.initialValue.firstName.trim() : "";
@@ -368,17 +373,20 @@ export default function MatchForm({ formAction }: MatchFormProps) {
             color="primary"
             variant="contained"
             fullWidth
-            disabled={isPending || showAdb2cLoadingModal}
+            disabled={isPending || mfaOnErrorTriggered === true || mfaOnSuccessTriggered === true}
             sx={{ marginY: 3 }}
           >
             Next
           </Button>
 
           <CancelLink onClick={() => logCustomEvent("Cancel")} />
+
+          <ReCaptcha reCaptchaSiteKey={reCaptchaSiteKey} />
         </Container>
-        {/* Separate modals for the form loading and the form navigating out to ADB2C */}
+        {/* Separate loading modals for form submitting, navigating out to ADB2C on MFA Success and navigating to error page on MFA error */}
         <RacwaLoadingModal message="Submitting" open={isPending} />
-        <RacwaLoadingModal message="We've verified you!" open={showAdb2cLoadingModal} />
+        <RacwaLoadingModal message="We've verified you!" open={mfaOnSuccessTriggered === true} />
+        <RacwaLoadingModal message="Something went wrong" open={mfaOnErrorTriggered === true} />
       </div>
     </form>
   );

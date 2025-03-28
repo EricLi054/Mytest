@@ -37,28 +37,8 @@ const getProps = (cardColour = "Gold"): RACMemberCardProps => ({
   },
 });
 
-const storageKey = "storybook-digital-card-promo-key";
-
 export const Default = () => {
   return <RACMemberCard {...getProps("Blue")} />;
-};
-
-export const WithPromoMessagingLeftAligned = () => {
-  localStorage.removeItem(storageKey); // force the promo message to show
-  return (
-    <div style={{ paddingTop: 100 }}>
-      <RACMemberCard {...getProps()} storageKey={storageKey} />
-    </div>
-  );
-};
-
-export const WithPromoMessagingRightAligned = () => {
-  localStorage.removeItem(storageKey); // force the promo message to show
-  return (
-    <div style={{ paddingTop: 100, display: "flex", justifyContent: "flex-end" }}>
-      <RACMemberCard {...getProps()} storageKey={storageKey} />
-    </div>
-  );
 };
 
 export const WithSilverBackground = () => {

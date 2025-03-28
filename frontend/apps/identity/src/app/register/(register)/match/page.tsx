@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { RootContainer } from "#components/RootContainer";
+import { clientEnv } from "#env/client";
 import { getPageTitle } from "#utils/metadata";
 import { getRegistrationSession } from "#utils/session";
 
 import { matchFormAction } from "./actions";
 import MatchForm from "./Form";
-import { checkAndSendRegistrationOtp } from "./graphql/checkAndSendRegistrationOtp";
-import { checkAndVerifyRegistrationOtp } from "./graphql/checkAndVerifyRegistrationOtp";
-import { checkRegistrationOtp } from "./graphql/checkRegistrationOtp";
+import { getRegistrationOtpVerificationDetails } from "./graphql/getRegistrationOtpVerificationDetails";
+import { sendRegistrationOtp } from "./graphql/sendRegistrationOtp";
+import { verifyRegistrationOtp } from "./graphql/verifyRegistrationOtp";
 import { MfaModalDialogProvider } from "./providers/mfa";
-import { getMatchedPerson } from "./utils/mfa";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +23,11 @@ export default async function MatchPage() {
   return (
     <RootContainer>
       <MfaModalDialogProvider
-        getPerson={getMatchedPerson}
-        checkOtp={checkRegistrationOtp}
-        checkAndSendOtp={checkAndSendRegistrationOtp}
-        checkAndVerifyOtp={checkAndVerifyRegistrationOtp}
+        getVerificationDetailsAction={getRegistrationOtpVerificationDetails}
+        sendOtpAction={sendRegistrationOtp}
+        verifyOtpAction={verifyRegistrationOtp}
       >
-        <MatchForm formAction={matchFormAction} />
+        <MatchForm reCaptchaSiteKey={clientEnv().NEXT_PUBLIC_RECAPTCHA_SITE_KEY} formAction={matchFormAction} />
       </MfaModalDialogProvider>
     </RootContainer>
   );

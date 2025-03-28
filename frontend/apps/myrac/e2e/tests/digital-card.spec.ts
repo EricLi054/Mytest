@@ -1,16 +1,17 @@
-import { test } from '@playwright/test';
-import { LoginPage } from '../pages/LoginPage';
-import { LandingPage } from '../pages/LandingPage';
-import { ProfilePage } from '../pages/ProfilePage';
-import { MembershipPage } from '../pages/MembershipPage';
-import { RequestPlasticCardPage } from '../pages/RequestPlasticCardPage';
+import { test } from "@playwright/test";
 
-test.describe('Member request a new Plastic Card successfully', () => {
+import { LandingPage } from "../pages/LandingPage";
+import { LoginPage } from "../pages/LoginPage";
+import { MembershipPage } from "../pages/MembershipPage";
+import { ProfilePage } from "../pages/ProfilePage";
+import { RequestPlasticCardPage } from "../pages/RequestPlasticCardPage";
+
+test.describe("Member request a new Plastic Card successfully", () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
     const landingPage = new LandingPage(page);
 
-    await loginPage.goto();
+    await loginPage.gotoSignIn();
     await loginPage.verifyLoginPageElements();
     await loginPage.loginForDigitalCard();
 
@@ -20,7 +21,7 @@ test.describe('Member request a new Plastic Card successfully', () => {
     await page.close();
   });
 
-  test('verify digital card feature with inactive digital pass', async ({ page }) => {
+  test("verify digital card feature with inactive digital pass", async ({ page }) => {
     const landingPage = new LandingPage(page);
     const profilePage = new ProfilePage(page);
     const membershipPage = new MembershipPage(page);
@@ -35,12 +36,12 @@ test.describe('Member request a new Plastic Card successfully', () => {
   });
 });
 
-test.describe('Member check digital card with active digital pass', () => {
+test.describe("Member check digital card with active digital pass", () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
     const landingPage = new LandingPage(page);
 
-    await loginPage.goto();
+    await loginPage.gotoSignIn();
     await loginPage.verifyLoginPageElements();
     await loginPage.loginForDigitalCard();
 
@@ -50,7 +51,7 @@ test.describe('Member check digital card with active digital pass', () => {
     await page.close();
   });
 
-  test('verify digital card feature with active digital pass', async ({ page }) => {
+  test("verify digital card feature with active digital pass", async ({ page }) => {
     const landingPage = new LandingPage(page);
     const profilePage = new ProfilePage(page);
     const membershipPage = new MembershipPage(page);

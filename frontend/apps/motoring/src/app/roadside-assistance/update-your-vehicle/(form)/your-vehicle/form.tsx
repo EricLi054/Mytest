@@ -7,7 +7,7 @@ import { parseWithZod } from "@conform-to/zod";
 import { Box, FormControl } from "@mui/material";
 import BackButton from "#components/BackButton";
 import ContentfulNotificationCard from "#components/ContentfulNotificationCard";
-import { generateContentfulTooltipProps } from "#components/ContentfulTooltip/index";
+import { generateContentfulTooltipProps } from "#components/ContentfulTooltip";
 import FormLoadingModal from "#components/FormLoadingModal";
 import SubmitButton from "#components/SubmitButton";
 import { logEvent, logFieldTouched, logPageView } from "#utils/analyticsTagging";

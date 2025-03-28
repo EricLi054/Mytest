@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { EMPTY_URL } from "#constants";
-import { mockConfirmationContentfulData } from "#mocks/mockContentful";
+import { mockConfirmationContentfulData } from "#mocks/contentful";
 import StorybookStepperLayout from "#storybook/StorybookerStepperLayout";
 
 import { ConfirmationContainer } from "./container";

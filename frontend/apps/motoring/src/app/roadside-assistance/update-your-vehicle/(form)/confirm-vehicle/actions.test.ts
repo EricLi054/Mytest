@@ -1,159 +1,313 @@
 import { redirect } from "next/navigation";
+import { mockSessionIds, mockUpdateYourVehicleSession } from "#mocks/session";
+import { mockVehicleDetails } from "#mocks/vehicle";
 import { mockTracer } from "#testing/otel";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getSessionIds } from "#utils/getSessionIds";
+import { describe, expect, it, vi } from "vitest";
 
-import type { UpdateYourVehicleSession } from "../../session/types";
 import { getUpdateYourVehiclePageUrl } from "../../routing";
-import { getUpdateYourVehicleSession, setUpdateYourVehicleSession } from "../../session";
+import { getUpdateYourVehicleSession, setUpdateYourVehicleSession } from "../../UpdateYourVehicleSession";
 import { confirmVehicle } from "./actions";
 import { updateRoadsideVehicle } from "./data";
 
-vi.mock("next/navigation");
-vi.mock("../../session");
-vi.mock("./data");
-
 vi.mock("server-only", () => ({}));
-
+vi.mock("next/navigation", { spy: true });
+vi.mock("#utils/getSessionIds");
+vi.mock("#utils/getVehicleCardInfo");
+vi.mock("../../UpdateYourVehicleSession");
+vi.mock("./data");
 vi.mock("@opentelemetry/api", () => ({
   trace: { getTracer: mockTracer },
 }));
 
-const mockUpdateYourVehicleSession = {
-  crmId: "123",
-  firstName: "John",
-  productHoldingHeaderId: "123",
-  productHoldingLineId: "123",
-  currentVehicleDetails: {
-    registrationNumber: "1ANURAG",
-    year: 2022,
-    make: "Toyota",
-    model: "Corolla",
-    variant: "Sedan",
-    series: "E210",
-    body: "Sedan",
-    height: 1435,
-    length: 4630,
-    width: 1780,
-    kerbWeight: 1300,
-    transmission: "Automatic",
-    fuel: "Petrol",
-    cylinder: "4",
-    cc: "1798",
-    co2Emission: "120",
-    vin: "JTDBU4EE9B9123456",
-    nvic: "1234567890",
-    color: "Blue",
-    vehicleType: "CAR",
-  },
-  searchedVehicleDetails: {
-    registrationNumber: "1ANURAG",
-    year: 2022,
-    make: "Toyota",
-    model: "Corolla",
-    variant: "Sedan",
-    series: "E210",
-    body: "Sedan",
-    height: 1435,
-    length: 4630,
-    width: 1780,
-    kerbWeight: 1300,
-    transmission: "Automatic",
-    fuel: "Petrol",
-    cylinder: "4",
-    cc: "1798",
-    co2Emission: "120",
-    vin: "JTDBU4EE9B9123456",
-    nvic: "1234567890",
-    vehicleType: "CAR",
-  },
-  steps: {
-    yourVehicle: undefined,
-    updateVehicle: {
-      vehicleColour: "Blue",
-      vehicleNotFound: "false",
-      vehicleRego: "1ANURAG",
-      vehicleSelect: "true",
-      vehicleType: "Car",
-    },
-    confirmVehicle: {
-      vehicleUpdated: false,
-    },
-  },
-} as const satisfies UpdateYourVehicleSession;
+const sessionIds = mockSessionIds();
 
-describe("confirmVehicle", () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
+describe("ConfirmVehicleActions", () => {
+  describe("confirmVehicle", () => {
+    it("should redirect to /system-unavailable when getting session IDs fails", async () => {
+      vi.mocked(getSessionIds).mockResolvedValue({ success: false, error: "Missing CRM ID" });
 
-  it("should redirect to system unavailable if searchedVehicleDetails is undefined", async () => {
-    vi.mocked(getUpdateYourVehicleSession).mockResolvedValue({
-      session: { ...mockUpdateYourVehicleSession, searchedVehicleDetails: undefined },
-      sessionTtl: 123456,
+      await expect(async () => await confirmVehicle()).rejects.toThrow();
+
+      expect(redirect).toHaveBeenCalledExactlyOnceWith(getUpdateYourVehiclePageUrl({ page: "/system-unavailable" }));
+      expect(getSessionIds).toHaveBeenCalledExactlyOnceWith<Parameters<typeof getSessionIds>>({
+        cookieName: "rac-motoring-uyv-session-id",
+      });
+      expect(getUpdateYourVehicleSession).not.toHaveBeenCalled();
+      expect(updateRoadsideVehicle).not.toHaveBeenCalled();
+      expect(setUpdateYourVehicleSession).not.toHaveBeenCalled();
     });
 
-    await confirmVehicle();
+    it("should redirect to redirectTo page when getting session fails", async () => {
+      vi.mocked(getSessionIds).mockResolvedValue({ success: true, ...sessionIds });
 
-    expect(getUpdateYourVehicleSession).toHaveBeenCalled();
-    expect(redirect).toHaveBeenCalledWith(getUpdateYourVehiclePageUrl({ page: "/system-unavailable" }));
-  });
+      const getSessionResult = { success: false, redirectTo: "/confirmation" } as const satisfies Awaited<
+        ReturnType<typeof getUpdateYourVehicleSession>
+      >;
+      vi.mocked(getUpdateYourVehicleSession).mockResolvedValue(getSessionResult);
 
-  it("should update vehicle and redirect to confirmation page", async () => {
-    vi.mocked(getUpdateYourVehicleSession).mockResolvedValue({
-      session: mockUpdateYourVehicleSession,
-      sessionTtl: 123456,
+      await expect(async () => await confirmVehicle()).rejects.toThrow();
+
+      expect(redirect).toHaveBeenCalledExactlyOnceWith(
+        getUpdateYourVehiclePageUrl({ page: getSessionResult.redirectTo }),
+      );
+      expect(getSessionIds).toHaveBeenCalledExactlyOnceWith<Parameters<typeof getSessionIds>>({
+        cookieName: "rac-motoring-uyv-session-id",
+      });
+      expect(getUpdateYourVehicleSession).toHaveBeenCalledExactlyOnceWith<
+        Parameters<typeof getUpdateYourVehicleSession>
+      >({
+        currentPage: "/confirm-vehicle",
+        ...sessionIds,
+      });
+      expect(updateRoadsideVehicle).not.toHaveBeenCalled();
+      expect(setUpdateYourVehicleSession).not.toHaveBeenCalled();
     });
-    vi.mocked(updateRoadsideVehicle).mockResolvedValue({
-      data: { updateRoadsideVehicle: { __typename: "RoadsideProduct" } },
-      errors: undefined,
-    });
-    vi.mocked(setUpdateYourVehicleSession).mockResolvedValue(undefined);
 
-    await confirmVehicle();
+    it("should redirectTo /system-unavailable when updateVehicle step is not in session", async () => {
+      vi.mocked(getSessionIds).mockResolvedValue({ success: true, ...sessionIds });
+      vi.mocked(getUpdateYourVehicleSession).mockResolvedValue({
+        success: true,
+        sessionTtl: 12345,
+        session: mockUpdateYourVehicleSession({
+          searchedVehicleDetails: mockVehicleDetails(),
+          steps: {
+            updateVehicle: undefined,
+          },
+        }),
+      });
 
-    expect(getUpdateYourVehicleSession).toHaveBeenCalled();
-    expect(updateRoadsideVehicle).toHaveBeenCalledWith({
-      productId: mockUpdateYourVehicleSession.productHoldingHeaderId,
-      lineId: mockUpdateYourVehicleSession.productHoldingLineId,
-      newVehicleDetail: {
-        ...mockUpdateYourVehicleSession.searchedVehicleDetails,
-        color: mockUpdateYourVehicleSession.steps.updateVehicle.vehicleColour,
-      },
+      await expect(async () => await confirmVehicle()).rejects.toThrow();
+
+      expect(redirect).toHaveBeenCalledExactlyOnceWith(getUpdateYourVehiclePageUrl({ page: "/system-unavailable" }));
+      expect(getSessionIds).toHaveBeenCalledExactlyOnceWith<Parameters<typeof getSessionIds>>({
+        cookieName: "rac-motoring-uyv-session-id",
+      });
+      expect(getUpdateYourVehicleSession).toHaveBeenCalledExactlyOnceWith<
+        Parameters<typeof getUpdateYourVehicleSession>
+      >({
+        currentPage: "/confirm-vehicle",
+        ...sessionIds,
+      });
+      expect(updateRoadsideVehicle).not.toHaveBeenCalled();
+      expect(setUpdateYourVehicleSession).not.toHaveBeenCalled();
     });
-    expect(setUpdateYourVehicleSession).toHaveBeenCalledWith({
-      session: {
-        ...mockUpdateYourVehicleSession,
+
+    it("should redirectTo /system-unavailable when searchedVehicleDetails in not in session", async () => {
+      vi.mocked(getSessionIds).mockResolvedValue({ success: true, ...sessionIds });
+      vi.mocked(getUpdateYourVehicleSession).mockResolvedValue({
+        success: true,
+        sessionTtl: 12345,
+        session: mockUpdateYourVehicleSession({
+          searchedVehicleDetails: undefined,
+          steps: {
+            updateVehicle: {
+              vehicleType: "Car",
+              vehicleSelect: "true",
+              vehicleNotFound: "false",
+              vehicleRego: "1ANURAG",
+              vehicleColour: "Black",
+            },
+          },
+        }),
+      });
+
+      await expect(async () => await confirmVehicle()).rejects.toThrow();
+
+      expect(redirect).toHaveBeenCalledExactlyOnceWith(getUpdateYourVehiclePageUrl({ page: "/system-unavailable" }));
+      expect(getSessionIds).toHaveBeenCalledExactlyOnceWith<Parameters<typeof getSessionIds>>({
+        cookieName: "rac-motoring-uyv-session-id",
+      });
+      expect(getUpdateYourVehicleSession).toHaveBeenCalledExactlyOnceWith<
+        Parameters<typeof getUpdateYourVehicleSession>
+      >({
+        currentPage: "/confirm-vehicle",
+        ...sessionIds,
+      });
+      expect(updateRoadsideVehicle).not.toHaveBeenCalled();
+      expect(setUpdateYourVehicleSession).not.toHaveBeenCalled();
+    });
+
+    it("should redirectTo /system-unavailable when updateRoadsideVehicle returns errors", async () => {
+      vi.mocked(getSessionIds).mockResolvedValue({ success: true, ...sessionIds });
+
+      const searchedVehicleDetails = mockVehicleDetails();
+      const existingSession = mockUpdateYourVehicleSession({
+        searchedVehicleDetails,
         steps: {
-          ...mockUpdateYourVehicleSession.steps,
-          confirmVehicle: { vehicleUpdated: true },
+          updateVehicle: {
+            vehicleType: "Car",
+            vehicleSelect: "true",
+            vehicleNotFound: "false",
+            vehicleRego: "1ANURAG",
+            vehicleColour: "Black",
+          },
         },
-      },
-      currentPage: "/confirm-vehicle",
-    });
-    expect(redirect).toHaveBeenCalledWith(getUpdateYourVehiclePageUrl({ page: "/confirmation" }));
-  });
+      });
+      vi.mocked(getUpdateYourVehicleSession).mockResolvedValue({
+        success: true,
+        sessionTtl: 12345,
+        session: existingSession,
+      });
 
-  it("should redirect to system unavailable if updateVehicle returns errors", async () => {
-    vi.mocked(getUpdateYourVehicleSession).mockResolvedValue({
-      session: mockUpdateYourVehicleSession,
-      sessionTtl: 123456,
-    });
-    vi.mocked(updateRoadsideVehicle).mockResolvedValue({
-      data: { updateRoadsideVehicle: { __typename: "RoadsideProduct" } },
-      errors: [{ name: "Error", message: "Error" }],
+      vi.mocked(updateRoadsideVehicle).mockResolvedValue({
+        data: { updateRoadsideVehicle: { __typename: "RoadsideProduct" } },
+        errors: [{ name: "Error", message: "Error" }],
+      });
+
+      await expect(async () => await confirmVehicle()).rejects.toThrow();
+
+      expect(redirect).toHaveBeenCalledExactlyOnceWith(getUpdateYourVehiclePageUrl({ page: "/system-unavailable" }));
+      expect(getSessionIds).toHaveBeenCalledExactlyOnceWith<Parameters<typeof getSessionIds>>({
+        cookieName: "rac-motoring-uyv-session-id",
+      });
+      expect(getUpdateYourVehicleSession).toHaveBeenCalledExactlyOnceWith<
+        Parameters<typeof getUpdateYourVehicleSession>
+      >({
+        currentPage: "/confirm-vehicle",
+        ...sessionIds,
+      });
+
+      expect(updateRoadsideVehicle).toHaveBeenCalledExactlyOnceWith<Parameters<typeof updateRoadsideVehicle>>({
+        productId: existingSession.productHoldingHeaderId,
+        lineId: existingSession.productHoldingLineId,
+        newVehicleDetail: {
+          ...searchedVehicleDetails,
+          color: existingSession.steps.updateVehicle?.vehicleColour,
+        },
+      });
+      expect(setUpdateYourVehicleSession).not.toHaveBeenCalled();
     });
 
-    await confirmVehicle();
+    it("should redirect to redirectTo page when setting session fails", async () => {
+      vi.mocked(getSessionIds).mockResolvedValue({ success: true, ...sessionIds });
 
-    expect(getUpdateYourVehicleSession).toHaveBeenCalled();
-    expect(updateRoadsideVehicle).toHaveBeenCalledWith({
-      productId: mockUpdateYourVehicleSession.productHoldingHeaderId,
-      lineId: mockUpdateYourVehicleSession.productHoldingLineId,
-      newVehicleDetail: {
-        ...mockUpdateYourVehicleSession.searchedVehicleDetails,
-        color: mockUpdateYourVehicleSession.steps.updateVehicle.vehicleColour,
-      },
+      const searchedVehicleDetails = mockVehicleDetails();
+      const existingSession = mockUpdateYourVehicleSession({
+        searchedVehicleDetails,
+        steps: {
+          updateVehicle: {
+            vehicleType: "Car",
+            vehicleSelect: "true",
+            vehicleNotFound: "false",
+            vehicleRego: "1ANURAG",
+            vehicleColour: "Black",
+          },
+        },
+      });
+      vi.mocked(getUpdateYourVehicleSession).mockResolvedValue({
+        success: true,
+        sessionTtl: 12345,
+        session: existingSession,
+      });
+
+      vi.mocked(updateRoadsideVehicle).mockResolvedValue({
+        data: { updateRoadsideVehicle: { __typename: "RoadsideProduct" } },
+        errors: undefined,
+      });
+
+      const setSessionResult = { success: false, redirectTo: "/system-unavailable" } as const satisfies Awaited<
+        ReturnType<typeof setUpdateYourVehicleSession>
+      >;
+      vi.mocked(setUpdateYourVehicleSession).mockResolvedValue(setSessionResult);
+
+      const updatedSession = mockUpdateYourVehicleSession({
+        ...existingSession,
+        steps: { ...existingSession.steps, confirmVehicle: { vehicleUpdated: true } },
+      });
+
+      await expect(async () => await confirmVehicle()).rejects.toThrow();
+
+      expect(redirect).toHaveBeenCalledExactlyOnceWith(
+        getUpdateYourVehiclePageUrl({ page: setSessionResult.redirectTo }),
+      );
+      expect(getSessionIds).toHaveBeenCalledExactlyOnceWith<Parameters<typeof getSessionIds>>({
+        cookieName: "rac-motoring-uyv-session-id",
+      });
+      expect(getUpdateYourVehicleSession).toHaveBeenCalledExactlyOnceWith<
+        Parameters<typeof getUpdateYourVehicleSession>
+      >({
+        currentPage: "/confirm-vehicle",
+        ...sessionIds,
+      });
+
+      expect(updateRoadsideVehicle).toHaveBeenCalledExactlyOnceWith<Parameters<typeof updateRoadsideVehicle>>({
+        productId: existingSession.productHoldingHeaderId,
+        lineId: existingSession.productHoldingLineId,
+        newVehicleDetail: {
+          ...searchedVehicleDetails,
+          color: existingSession.steps.updateVehicle?.vehicleColour,
+        },
+      });
+      expect(setUpdateYourVehicleSession).toHaveBeenCalledExactlyOnceWith<
+        Parameters<typeof setUpdateYourVehicleSession>
+      >({
+        session: updatedSession,
+        ...sessionIds,
+      });
     });
-    expect(redirect).toHaveBeenCalledWith(getUpdateYourVehiclePageUrl({ page: "/system-unavailable" }));
+
+    it("should update session and redirect to /confirmation", async () => {
+      vi.mocked(getSessionIds).mockResolvedValue({ success: true, ...sessionIds });
+
+      const searchedVehicleDetails = mockVehicleDetails();
+      const existingSession = mockUpdateYourVehicleSession({
+        searchedVehicleDetails,
+        steps: {
+          updateVehicle: {
+            vehicleType: "Car",
+            vehicleSelect: "true",
+            vehicleNotFound: "false",
+            vehicleRego: "1ANURAG",
+            vehicleColour: "Black",
+          },
+        },
+      });
+      vi.mocked(getUpdateYourVehicleSession).mockResolvedValue({
+        success: true,
+        sessionTtl: 12345,
+        session: existingSession,
+      });
+
+      vi.mocked(updateRoadsideVehicle).mockResolvedValue({
+        data: { updateRoadsideVehicle: { __typename: "RoadsideProduct" } },
+        errors: undefined,
+      });
+
+      vi.mocked(setUpdateYourVehicleSession).mockResolvedValue({ success: true });
+
+      const updatedSession = mockUpdateYourVehicleSession({
+        ...existingSession,
+        steps: { ...existingSession.steps, confirmVehicle: { vehicleUpdated: true } },
+      });
+
+      await expect(async () => await confirmVehicle()).rejects.toThrow();
+
+      expect(redirect).toHaveBeenCalledExactlyOnceWith(getUpdateYourVehiclePageUrl({ page: "/confirmation" }));
+      expect(getSessionIds).toHaveBeenCalledExactlyOnceWith<Parameters<typeof getSessionIds>>({
+        cookieName: "rac-motoring-uyv-session-id",
+      });
+      expect(getUpdateYourVehicleSession).toHaveBeenCalledExactlyOnceWith<
+        Parameters<typeof getUpdateYourVehicleSession>
+      >({
+        currentPage: "/confirm-vehicle",
+        ...sessionIds,
+      });
+
+      expect(updateRoadsideVehicle).toHaveBeenCalledExactlyOnceWith<Parameters<typeof updateRoadsideVehicle>>({
+        productId: existingSession.productHoldingHeaderId,
+        lineId: existingSession.productHoldingLineId,
+        newVehicleDetail: {
+          ...searchedVehicleDetails,
+          color: existingSession.steps.updateVehicle?.vehicleColour,
+        },
+      });
+      expect(setUpdateYourVehicleSession).toHaveBeenCalledExactlyOnceWith<
+        Parameters<typeof setUpdateYourVehicleSession>
+      >({
+        session: updatedSession,
+        ...sessionIds,
+      });
+    });
   });
 });

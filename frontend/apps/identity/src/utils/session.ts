@@ -8,6 +8,7 @@ import { annotatedLog } from "#utils/logging";
 import { getServerSession } from "next-auth";
 
 import { DataCacheError, getCacheFor } from "@racwa/cache";
+import { createMfaSessionKey } from "@racwa/mfa";
 
 import type { RegistrationPage } from "./routing";
 import { getRegistrationErrorPageUrl } from "./routing";
@@ -22,6 +23,7 @@ const slidingTtlMillis = 1_800_000; // 30 minutes in milliseconds
 
 export type RegistrationSession = {
   id: string | undefined;
+  mfaSessionKey: string | undefined;
   redirectUrl: string | undefined;
   person: Person | undefined;
   incorrectMatchAttempts: number;
@@ -33,6 +35,7 @@ export type RegistrationSession = {
 
 export const initialSession = {
   id: undefined,
+  mfaSessionKey: undefined,
   redirectUrl: undefined,
   person: undefined,
   incorrectMatchAttempts: 0,
@@ -69,7 +72,12 @@ export const createRegistrationSession = async (redirectUrl?: string) => {
 
   const result = await sessionCache.create({
     cacheKey: sessionId,
-    data: { ...initialSession, id: sessionId, redirectUrl },
+    data: {
+      ...initialSession,
+      id: sessionId,
+      mfaSessionKey: createMfaSessionKey("my-rac-account-registration", sessionId),
+      redirectUrl,
+    },
     absoluteTtlMillis,
     slidingTtlMillis,
   });
@@ -110,7 +118,7 @@ export const getRegistrationSession = async ({
   return session;
 };
 
-export const updateRegistrationSession = async ({ session }: { session: RegistrationSession }) => {
+export const updateRegistrationSession = async ({ session }: { session: RegistrationSession }): Promise<void> => {
   const log = (message: string, sessionId?: string, crmId?: string) =>
     annotatedLog("updateRegistrationSession", message, sessionId, crmId);
 
@@ -173,11 +181,9 @@ export const validateCurrentPage = ({
     log(`Allowed incorrect match attempts exceeded: ${session.incorrectMatchAttempts}`);
     return redirect(getRegistrationErrorPageUrl({ page: "/cant-find-you" }));
   }
-
-  // TODO - DED-1296 - add MFA completed check, TTL of the session needs to be considered so that they do not stay authenticated outside the 10 min OTP Service authenticated timeframe
 };
 
-// Extract and validate a redirection URL passed in as a query string
+/** Extract and validate a redirection URL passed in as a query string */
 export function extractRedirectUrl(
   referer: string | null,
   validHosts: string[],

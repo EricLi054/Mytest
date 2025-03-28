@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { mockConfirmVehicleContentfulData } from "#mocks/mockContentful";
+import { mockConfirmVehicleContentfulData } from "#mocks/contentful";
 import StorybookStepperLayout from "#storybook/StorybookerStepperLayout";
 
 import { ConfirmVehicleContainer } from "./container";

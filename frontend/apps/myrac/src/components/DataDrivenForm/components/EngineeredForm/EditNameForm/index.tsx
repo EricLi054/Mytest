@@ -22,7 +22,7 @@ export const EditNameFormStep2 = () => {
         const person = await getPerson({ mfaSessionKey: MFASessionKey.ContactDetails });
         setData(getEditNameFormStep2Schema(person));
       } catch {
-        router.push(errorPages.unhandledError);
+        router.push(errorPages.somethingWentWrong);
       }
     };
     void getData();

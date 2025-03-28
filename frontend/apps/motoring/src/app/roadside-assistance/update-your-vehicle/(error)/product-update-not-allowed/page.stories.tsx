@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { EMPTY_URL } from "#constants";
-import { mockUpdateNotAllowedContentfulData } from "#mocks/mockContentful";
+import { mockUpdateNotAllowedContentfulData } from "#mocks/contentful";
 
 import Component from "./container";
 

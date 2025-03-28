@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { UpdateYourVehiclePage } from "./routing";
+import type { UpdateYourVehicleErrorPage, UpdateYourVehicleFormPage } from "./routing";
 import { getUpdateYourVehiclePageUrl, getUpdateYourVehicleTimeoutUrl } from "./routing";
 
 const absolutePath = (suffix?: string) => `/roadside-assistance/update-your-vehicle${suffix ?? ""}`;
@@ -13,7 +13,7 @@ describe("getUpdateYourVehiclePageUrl", () => {
     "/confirmation",
     "/system-unavailable",
     "/session-timeout",
-  ] satisfies Exclude<UpdateYourVehiclePage["formPage" | "errorPage"], "/">[])(
+  ] satisfies (UpdateYourVehicleFormPage | UpdateYourVehicleErrorPage)[])(
     "should return absolute UpdateYourVehicle path with trailing page when page is %s",
     (page) => {
       expect(getUpdateYourVehiclePageUrl({ page })).toBe(absolutePath(page));

@@ -10,20 +10,12 @@ export const IdentificationMethod = {
 
 export type IdentificationMethodValue = (typeof IdentificationMethod)[keyof typeof IdentificationMethod];
 
-export type OtpVerificationDetails = {
-  sessionKey: string;
-  isAuthenticated: boolean;
-  isMobile: boolean | null; // TODO - DED-1296 - Null or undefined? GQL vs Session is different and causing problems
-  phoneNumberSuffix: string | null; // TODO - DED-1296 - Null or undefined? GQL vs Session is different and causing problems
-};
-
 export type Person = {
   personId: string;
   racId: string;
   firstName: string;
   mobilePhone: string | null;
   membershipType: string | null;
-  otpVerificationDetails: OtpVerificationDetails | null;
 };
 
 export type MatchResponse = {

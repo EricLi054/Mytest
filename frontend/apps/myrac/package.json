@@ -13,8 +13,11 @@
     "start": "pnpm next start",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test --config=playwright.config.ts",
+    "test:e2e": "playwright test --config=e2e",
     "test:e2e:local": "playwright test --headed --config=e2e",
+    "test:e2e:headed": "playwright test --headed --config=playwright.config.ts",
+    "test:e2e:sit": "set CONTAINER_APP_ENV=sit && playwright test --headed --config=e2e",
+    "test:e2e:headed:uat": "powershell -Command \"$env:PLAYWRIGHT_ENV='UAT'; pnpm test:e2e:headed\"",
     "typecheck": "tsc --noEmit"
   },
   "imports": {

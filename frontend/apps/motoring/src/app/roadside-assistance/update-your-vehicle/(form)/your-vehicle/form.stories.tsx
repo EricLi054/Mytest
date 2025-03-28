@@ -1,7 +1,7 @@
 import type { SubmissionResult } from "@conform-to/react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { EMPTY_URL } from "#constants";
-import { mockYourVehicleContentfulData } from "#mocks/mockContentful";
+import { mockYourVehicleContentfulData } from "#mocks/contentful";
 import StorybookStepperLayout from "#storybook/StorybookerStepperLayout";
 
 import YourVehicleForm from "./form";

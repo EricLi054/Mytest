@@ -2,30 +2,18 @@
 
 import { getRegistrationSession } from "#utils/session";
 
-import type { Person } from "../types";
-
-/**
- * Get the matched person in the registration session for the '/match' page.
- *
- * @returns Matched Person
- */
-export async function getMatchedPerson(): Promise<Person> {
-  const session = await getRegistrationSession({ currentPage: "/match" });
-
-  if (!session.person) {
-    throw new Error("Person does not exist on the registration session for the '/match' page");
-  }
-
-  return session.person;
-}
-
 /**
  * Get the CRM ID from the matched person in the registration session for the '/match' page.
  *
  * @returns CRM ID of Matched Person
  */
 export async function getCrmId(): Promise<string> {
-  const person = await getMatchedPerson();
+  const session = await getRegistrationSession({ currentPage: "/match" });
+
+  const person = session.person;
+  if (!person) {
+    throw new Error("Person does not exist on the registration session");
+  }
 
   const crmId = person.personId;
   if (!crmId || crmId.trim() === "") {
@@ -33,4 +21,30 @@ export async function getCrmId(): Promise<string> {
   }
 
   return crmId;
+}
+
+/**
+ * Get the MFA Session Key and the CRM ID from the matched
+ * person in the registration session for the '/match' page.
+ *
+ * @returns MFA Session Key and CRM ID of Matched Person
+ */
+export async function getMfaSessionKeyAndCrmId(): Promise<[string, string]> {
+  const session = await getRegistrationSession({ currentPage: "/match" });
+
+  const mfaSessionKey = session.mfaSessionKey;
+  if (!mfaSessionKey || mfaSessionKey.trim() === "") {
+    throw new Error("MFA Session Key does not exist on the registration session");
+  }
+
+  if (!session.person) {
+    throw new Error("Person does not exist on the registration session for the '/match' page");
+  }
+
+  const crmId = session.person.personId;
+  if (!crmId || crmId.trim() === "") {
+    throw new Error("CRM ID is not defined on the Person in registration session for the '/match' page");
+  }
+
+  return [mfaSessionKey, crmId];
 }

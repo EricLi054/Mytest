@@ -19,8 +19,6 @@ const StyledBox = styled(Box)(({ theme }) => ({
 
   [theme.breakpoints.down("sm")]: {
     margin: "0",
-    height: "100vh",
     width: "100vw",
-    maxHeight: "100vh",
   },
 }));

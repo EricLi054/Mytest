@@ -9,7 +9,8 @@
     "dev": "pnpm next dev",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test --ui",
+    "test:e2e": "playwright test --config=e2e",
+    "test:e2e:sit": "set CONTAINER_APP_ENV=sit && playwright test --headed --config=e2e",
     "format": "prettier --check . --ignore-path ./.prettierignore",
     "lint": "eslint",
     "start": "pnpm next start",
@@ -58,6 +59,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@racwa/automation": "workspace:*",
     "@racwa/eslint-config": "workspace:*",
     "@racwa/playwright-config": "workspace:*",
     "@racwa/prettier-config": "workspace:*",
@@ -74,7 +77,6 @@
     "dotenv": "catalog:",
     "eslint": "catalog:",
     "mailosaur": "8.8.1",
-    "playwright": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { deleteSessionCookie } from "../../session/actions";
+import { deleteSessionCookie } from "./actions";
 
 export default function DeleteCookie() {
   useEffect(() => {

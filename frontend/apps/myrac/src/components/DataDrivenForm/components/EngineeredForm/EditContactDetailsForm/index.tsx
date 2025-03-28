@@ -24,7 +24,7 @@ export const EditContactDetailsFormStep2 = () => {
         const person = await getPerson({ mfaSessionKey: MFASessionKey.ContactDetails });
         setData(getEditContactDetailsFormStep2Schema(person, B2C_URL));
       } catch {
-        router.push(errorPages.unhandledError);
+        router.push(errorPages.somethingWentWrong);
       }
     };
     void getData();

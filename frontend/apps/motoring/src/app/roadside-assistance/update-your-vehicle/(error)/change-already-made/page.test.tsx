@@ -1,18 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { getContentfulErrorPageData } from "#contentful/getErrorPageData";
 import { clientEnv } from "#env/client";
-import { mockChangeAlreadyMadeContentfulData } from "#mocks/mockContentful";
+import { mockChangeAlreadyMadeContentfulData } from "#mocks/contentful";
 import { expectGtmCustomEvent } from "#testing/analytics";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChangeAlreadyMade from "./page";
 
 vi.mock("server-only", () => ({}));
-vi.mock("#contentful/getErrorPageData", () => {
-  return { getContentfulErrorPageData: vi.fn().mockResolvedValue(mockChangeAlreadyMadeContentfulData) };
-});
+vi.mock("#contentful/getErrorPageData");
 
-describe("ChangeAlreadyMade", () => {
+describe("ChangeAlreadyMadePage", () => {
+  beforeEach(() => {
+    vi.mocked(getContentfulErrorPageData).mockResolvedValue(mockChangeAlreadyMadeContentfulData);
+  });
+
   it("should render", async () => {
     render(await ChangeAlreadyMade());
 

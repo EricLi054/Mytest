@@ -13,7 +13,7 @@ const hasActiveDigitalCard = (cardDetails: DigitalCardDetails | undefined): bool
   return cardDetails ? cardDetails.isActive : false;
 };
 
-function renderMemberCard(person: Person, storageKey: string) {
+function renderMemberCard(person: Person) {
   if (!person.digitalCardDetails || !hasActiveDigitalCard(person.digitalCardDetails)) {
     return (
       <Grid
@@ -26,21 +26,19 @@ function renderMemberCard(person: Person, storageKey: string) {
     );
   }
 
-  return <RACMemberCard person={person} storageKey={storageKey} />;
+  return <RACMemberCard person={person} />;
 }
 type MemberDetailsBarProps = {
   person: Person;
 } & EngineeredJourneyProps;
 
-const MemberDetailsBar = ({ person, engineeredContent }: MemberDetailsBarProps) => {
-  const storageKey = engineeredContent?.getById("digital-card-promo-storage-key")?.stringContent ?? "";
-
+const MemberDetailsBar = ({ person }: MemberDetailsBarProps) => {
   return (
     <StyledBackgroundContainer container justifyContent="center">
       <Grid container flexWrap="nowrap" direction={{ xs: "column", md: "row" }} gap={{ xs: 2, md: 3 }} width="100%">
         <Grid flexGrow={1}>
           <Grid container direction={{ xs: "row-reverse", md: "row" }} gap={4} flexWrap="nowrap">
-            {renderMemberCard(person, storageKey)}
+            {renderMemberCard(person)}
             <Grid color="white" flexGrow={1} alignContent="center">
               <Typography variant="h3" color="inherit">
                 {person.title} {person.firstName && person.firstName.length > 0 ? person.firstName[0] : ""}{" "}

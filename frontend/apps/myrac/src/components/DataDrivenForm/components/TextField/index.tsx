@@ -13,6 +13,7 @@ const FieldSchema = z.object({
   input: FieldInputProps,
   label: z.string(),
   required: z.boolean(),
+  disabled: z.boolean().nullable().optional(),
   helperText: z.string().nullable().optional(),
   tooltipTitle: z.string().nullable().optional(),
   tooltipText: z.string().nullable().optional(),
@@ -23,7 +24,7 @@ const FieldSchema = z.object({
 export const TextField = (props: UseFieldApiConfig) => {
   const fieldProps = useFieldApi(props);
 
-  const { input, label, required, helperText, tooltipTitle, tooltipText, placeholder, meta } =
+  const { input, label, required, helperText, tooltipTitle, tooltipText, placeholder, meta, disabled } =
     FieldSchema.parse(fieldProps);
 
   const { logFormFieldTouched, logFormFieldValidation } = useGTMFormEvents(props);
@@ -56,6 +57,7 @@ export const TextField = (props: UseFieldApiConfig) => {
       placeholder={placeholder}
       onBlur={logFormFieldValidation}
       onFocus={logFormFieldTouched}
+      disabledInput={disabled ?? false}
     />
   );
 };

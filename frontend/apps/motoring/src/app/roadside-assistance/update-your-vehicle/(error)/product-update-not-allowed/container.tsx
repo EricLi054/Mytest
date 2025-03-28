@@ -4,7 +4,7 @@ import type { Document } from "@contentful/rich-text-types";
 import type { ErrorPageSchema } from "#contentful/schema";
 import type { z } from "zod";
 import { useEffect } from "react";
-import RichTextRenderer from "#components/RichTextRenderer/index";
+import RichTextRenderer from "#components/RichTextRenderer";
 import { logEvent, logPageView } from "#utils/analyticsTagging";
 
 import type { FooterProps } from "@racwa/react-components";

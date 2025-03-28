@@ -8,7 +8,7 @@ import SystemUnavailable from "./page";
 
 vi.mock("server-only", () => ({}));
 
-describe("SystemUnavailable", () => {
+describe("SystemUnavailablePage", () => {
   it("should be able to render", () => {
     render(<SystemUnavailable />);
 

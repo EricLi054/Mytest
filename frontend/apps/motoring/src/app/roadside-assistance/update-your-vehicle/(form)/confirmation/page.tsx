@@ -4,10 +4,11 @@ import Timeout from "#components/Timeout";
 import { getContentfulConfirmationPageData } from "#contentful/getConfirmationPageData";
 import { clientEnv } from "#env/client";
 import { serverEnv } from "#env/server";
+import { getSessionIds } from "#utils/getSessionIds";
 import { getPageTitle } from "#utils/metadata";
 
 import { getMyRacUrl, getUpdateYourVehiclePageUrl, getUpdateYourVehicleTimeoutUrl } from "../../routing";
-import { getUpdateYourVehicleSession } from "../../session";
+import { getUpdateYourVehicleSession } from "../../UpdateYourVehicleSession";
 import { ConfirmationContainer } from "./container";
 import { ConfirmationPageSchema } from "./schema";
 
@@ -18,15 +19,30 @@ export const metadata: Metadata = {
 };
 
 export default async function Confirmation() {
-  const { session, sessionTtl } = await getUpdateYourVehicleSession({ currentPage: "/confirmation" });
-  const contentfulData = await getContentfulConfirmationPageData(
-    serverEnv().CONTENTFUL_CONFIRMATION_ID,
-    ConfirmationPageSchema,
-  );
+  const sessionIdsResult = await getSessionIds({ cookieName: "rac-motoring-uyv-session-id" });
+
+  if (!sessionIdsResult.success) {
+    redirect(getUpdateYourVehiclePageUrl({ page: "/system-unavailable" }));
+  }
+
+  const { crmId, sessionId } = sessionIdsResult;
+
+  const getSessionResult = await getUpdateYourVehicleSession({ currentPage: "/confirmation", crmId, sessionId });
+
+  if (!getSessionResult.success) {
+    redirect(getUpdateYourVehiclePageUrl({ page: getSessionResult.redirectTo }));
+  }
+
+  const { session, sessionTtl } = getSessionResult;
 
   if (!session.searchedVehicleDetails) {
     return redirect(getUpdateYourVehiclePageUrl({ page: "/system-unavailable" }));
   }
+
+  const contentfulData = await getContentfulConfirmationPageData(
+    serverEnv().CONTENTFUL_CONFIRMATION_ID,
+    ConfirmationPageSchema,
+  );
 
   return (
     <>

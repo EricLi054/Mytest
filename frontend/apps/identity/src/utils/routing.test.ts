@@ -19,10 +19,13 @@ describe("getRegistrationPageUrl", () => {
 });
 
 describe("getRegistrationErrorPageUrl", () => {
-  it.each(["/system-unavailable", "/session-timeout", "/cant-find-you"] satisfies RegistrationPage["errorPage"][])(
-    "should return Registration error page for %s",
-    (page) => {
-      expect(getRegistrationErrorPageUrl({ page })).toBe(`/register/error${page}`);
-    },
-  );
+  it.each([
+    "/system-unavailable",
+    "/session-timeout",
+    "/cant-find-you",
+    "/lapsed-membership",
+    "/already-matched",
+  ] satisfies RegistrationPage["errorPage"][])("should return Registration error page for %s", (page) => {
+    expect(getRegistrationErrorPageUrl({ page })).toBe(`/register/error${page}`);
+  });
 });

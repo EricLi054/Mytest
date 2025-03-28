@@ -1,9 +1,11 @@
+import { useActionState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EMPTY_URL } from "#constants";
-import { mockYourVehicleContentfulData } from "#mocks/mockContentful";
+import { mockYourVehicleContentfulData } from "#mocks/contentful";
 import { expectGtmCustomEvent } from "#testing/analytics";
-import { describe, expect, it, vi } from "vitest";
+import { useFormStatus } from "react-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { YourVehicleFormProps } from "./form";
 import YourVehicleForm from "./form";
@@ -15,7 +17,7 @@ vi.mock("react-dom", async () => {
   const actual = await vi.importActual("react-dom");
   return {
     ...actual,
-    useFormStatus: vi.fn().mockReturnValue({ pending: false }),
+    useFormStatus: vi.fn(),
   };
 });
 
@@ -23,7 +25,7 @@ vi.mock("react", async () => {
   const actual = await vi.importActual("react");
   return {
     ...actual,
-    useActionState: vi.fn().mockReturnValue([{}, vi.fn(), false]),
+    useActionState: vi.fn(),
   };
 });
 
@@ -46,6 +48,11 @@ const renderForm = (defaultValues?: { defaultValues: YourVehicleFormProps["defau
 };
 
 describe("YourVehicleForm", () => {
+  beforeEach(() => {
+    vi.mocked(useActionState).mockReturnValue([{}, vi.fn(), false]);
+    vi.mocked(useFormStatus).mockReturnValue({ pending: false, data: null, method: null, action: null });
+  });
+
   it("should be able to render with radio buttons and submit button", () => {
     renderForm();
 

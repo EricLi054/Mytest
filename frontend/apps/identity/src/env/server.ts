@@ -48,6 +48,9 @@ const serverEnvSchema = z.object({
   AZURE_AD_B2C_EMAIL_UPDATE_FLOW: z.string().min(1),
   AZURE_AD_B2C_PASSWORD_UPDATE_FLOW: z.string().min(1),
   AZURE_AD_B2C_JWKS_URL: z.string().url(),
+
+  // Google
+  RECAPTCHA_SITE_SECRET: z.string().min(1),
 });
 
 export const serverEnv = () => {

@@ -3,6 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import path from "path";
 import { fileURLToPath } from "url";
 import { cleanup } from "@testing-library/react";
+import { mockDataCache } from "#testing/cache";
 import { afterEach, beforeAll, beforeEach, vi } from "vitest";
 
 import initApplicationConfiguration from "@racwa/app-config";
@@ -16,6 +17,15 @@ vi.mock("@racwa/analytics", async () => {
   return {
     ...actual,
     gtm: vi.fn(),
+  };
+});
+
+vi.mock("@racwa/cache", async () => {
+  const actual = await vi.importActual("@racwa/cache");
+
+  return {
+    ...actual,
+    getCacheFor: () => mockDataCache(),
   };
 });
 

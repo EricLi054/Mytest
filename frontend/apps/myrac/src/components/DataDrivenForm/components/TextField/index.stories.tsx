@@ -98,3 +98,21 @@ WithTooltip.play = async () => {
   const tooltip = screen.getByRole("button");
   await userEvent.click(tooltip);
 };
+
+export const WithDisabledSet = DDFStoryTemplate.bind({});
+WithDisabledSet.args = {
+  schema: {
+    fields: [
+      {
+        name: "text-input",
+        label: "Text Input",
+        disableGTM: true,
+        helperText: "Help text",
+        placeholder: "e.g. Stuff",
+        required: false,
+        component: componentTypes.TEXT_FIELD,
+        disabled: true,
+      },
+    ],
+  },
+};

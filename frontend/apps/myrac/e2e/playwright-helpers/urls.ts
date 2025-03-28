@@ -1,37 +1,29 @@
 type Environment = "SIT" | "UAT";
 
-const envUrls = {
-  SIT: process.env.PLAYWRIGHT_BASE_SIT_URL,
-  UAT: process.env.PLAYWRIGHT_BASE_UAT_URL,
-} as const;
-
-console.log("Environment variables in urls.ts:", {
-  PLAYWRIGHT_ENV: process.env.PLAYWRIGHT_ENV,
-  PLAYWRIGHT_BASE_SIT_URL: process.env.PLAYWRIGHT_BASE_SIT_URL,
-  PLAYWRIGHT_BASE_UAT_URL: process.env.PLAYWRIGHT_BASE_UAT_URL,
-});
-
 export const getCurrentEnv = (): Environment => {
-  const env = (process.env.PLAYWRIGHT_ENV?.toUpperCase() as Environment) || "SIT";
-  console.log("Current environment:", env);
+  const env = process.env.PLAYWRIGHT_ENV?.toUpperCase();
+  if (env !== "SIT" && env !== "UAT") {
+    return "SIT";
+  }
   return env;
 };
 
 export const getBaseUrl = (): string => {
   const env = getCurrentEnv();
-  const baseUrl = envUrls[env];
-
-  if (!baseUrl) {
-    throw new Error(`Base URL for ${env} environment is not defined`);
+  switch (env) {
+    case "SIT":
+      return process.env.PLAYWRIGHT_BASE_SIT_URL ?? "";
+    case "UAT":
+      return process.env.PLAYWRIGHT_BASE_UAT_URL ?? "";
+    default:
+      throw new Error("The environment is not correct, and no valid URL can be determined.");
   }
-
-  return baseUrl;
 };
 
-export const baseURL = getBaseUrl();
+export const baseURL: string = getBaseUrl();
 
 export const urls = {
-  landing: `${baseURL}/myrac`,
+  landing: `${baseURL}`,
   login: "https://login*.rac*.com.au/**",
   logout: `${baseURL}/logout`,
   contactDetails: `${baseURL}/myrac/profile/contact-details`,

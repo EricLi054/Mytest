@@ -1,4 +1,4 @@
-import { INVALID_ERROR, REQUIRED_ERROR } from "#constants/index";
+import { INVALID_ERROR, REQUIRED_ERROR } from "#constants";
 import { NotificationCardSchema, RichTextContentSchema } from "#contentful/schema";
 import { z } from "zod";
 

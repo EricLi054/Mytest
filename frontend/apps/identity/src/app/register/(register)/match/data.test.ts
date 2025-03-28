@@ -16,20 +16,10 @@ vi.mock("@racwa/gql", () => ({
   execute: vi.fn(),
 }));
 
-const headerGetMock = vi.fn();
-vi.mock("next/headers", () => ({
-  headers: () => {
-    return {
-      get: headerGetMock,
-    };
-  },
-}));
-
 type Query = ExecuteProps<Result, GetMatchedPersonDataParams>["query"];
 
 const mockToken = "mockToken";
 const mockCorrelationID = "98765321";
-const mockMfaSessionKey = "my-rac-account-registration-123456789-987654321";
 const mockParams = {
   input: {
     request: {
@@ -39,7 +29,6 @@ const mockParams = {
       mobilePhone: "0412312312",
     },
   },
-  sessionKey: mockMfaSessionKey,
 };
 
 const { GRAPHQL_ENDPOINT } = serverEnv();
@@ -51,7 +40,7 @@ describe("getMatchedPersonData", () => {
 
   it("should return data when the query is successful", async () => {
     const consoleMock = vi.spyOn(console, "log");
-    const expectedHeaders = new HeadersBuilder().withCorrelationId(mockCorrelationID).withUserAgent().build();
+    const expectedHeaders = new HeadersBuilder().withCorrelationId(mockCorrelationID).build();
     const mockData = {
       data: {
         match: {
@@ -60,18 +49,12 @@ describe("getMatchedPersonData", () => {
             racId: "00000001",
             firstName: "John",
             mobilePhone: "04132112312",
-            otpVerificationDetails: {
-              sessionKey: mockMfaSessionKey,
-              isAuthenticated: false,
-              isMobile: true,
-              phoneNumberSuffix: "312",
-            },
+            membershipType: "Member",
           },
           errors: null,
         },
       },
     };
-    headerGetMock.mockReturnValueOnce(expectedHeaders["User-Agent"]);
     vi.mocked(getAccessToken).mockResolvedValue(mockToken);
     vi.mocked(execute).mockResolvedValue(mockData);
 
@@ -86,40 +69,57 @@ describe("getMatchedPersonData", () => {
       variables: mockParams,
       headers: expectedHeaders,
     });
-    expect(result).toEqual({
-      data: {
-        match: {
-          matchedPerson: {
-            personId: mockData.data.match.matchedPerson.personId,
-            racId: mockData.data.match.matchedPerson.racId,
-            firstName: mockData.data.match.matchedPerson.firstName,
-            mobilePhone: mockData.data.match.matchedPerson.mobilePhone,
-            otpVerificationDetails: {
-              sessionKey: mockData.data.match.matchedPerson.otpVerificationDetails.sessionKey,
-              isAuthenticated: mockData.data.match.matchedPerson.otpVerificationDetails.isAuthenticated,
-              isMobile: mockData.data.match.matchedPerson.otpVerificationDetails.isMobile,
-              phoneNumberSuffix: mockData.data.match.matchedPerson.otpVerificationDetails.phoneNumberSuffix,
-            },
-          },
-          errors: null,
-        },
-      },
-    });
+    expect(result).toEqual(mockData);
     expect(consoleMock).toHaveBeenCalledWith(
-      `[getMatchedPersonData]: Starting to check for member match with CorrelationID [${mockCorrelationID}] | Session: ${mockMfaSessionKey} | CRM: -`,
+      `[getMatchedPersonData]: Starting to check for member match with CorrelationID [${mockCorrelationID}] | Session: - | CRM: -`,
     );
   });
 
+  it.each(["NoMatchError", "DuplicateMatchError"])(
+    "should return data with null matchedPerson and match error of type %s",
+    async (errorType) => {
+      const expectedHeaders = new HeadersBuilder().withCorrelationId(mockCorrelationID).build();
+      const mockData = {
+        data: {
+          match: {
+            matchedPerson: null,
+            errors: [{ type: errorType }],
+          },
+        },
+      };
+      vi.mocked(getAccessToken).mockResolvedValue(mockToken);
+      vi.mocked(execute).mockResolvedValue(mockData);
+
+      const result = await getMatchedPersonData(mockParams);
+
+      expect(getAccessToken).toHaveBeenCalled();
+      expect(execute).toHaveBeenCalledWith({
+        endpoint: GRAPHQL_ENDPOINT,
+        sourceSystem: "identity",
+        token: mockToken,
+        query: expect.anything() as Query,
+        variables: mockParams,
+        headers: expectedHeaders,
+      });
+      expect(result).toEqual(mockData);
+    },
+  );
+
   it("should throw error if getAccessToken returns an error", async () => {
-    vi.mocked(getAccessToken).mockRejectedValueOnce(new Error());
+    const errorMessage = "getAccessToken exception";
+    const consoleMock = vi.spyOn(console, "error");
+    vi.mocked(getAccessToken).mockRejectedValueOnce(new Error(errorMessage));
 
     await expect(getMatchedPersonData(mockParams)).rejects.toThrow();
+    expect(consoleMock).toHaveBeenCalledWith(
+      `[getMatchedPersonData]: Failed to check for member match with CorrelationID [${mockCorrelationID}] | Error: ${errorMessage} | Session: - | CRM: -`,
+    );
   });
 
   it("should throw an error when the query fails", async () => {
     const mockError = new Error("Query failed");
-    const expectedHeaders = new HeadersBuilder().withCorrelationId(mockCorrelationID).withUserAgent().build();
-    headerGetMock.mockReturnValueOnce(expectedHeaders["User-Agent"]);
+    const expectedHeaders = new HeadersBuilder().withCorrelationId(mockCorrelationID).build();
+    const consoleMock = vi.spyOn(console, "error");
     vi.mocked(getAccessToken).mockResolvedValue(mockToken);
     vi.mocked(execute).mockRejectedValue(mockError);
 
@@ -134,5 +134,8 @@ describe("getMatchedPersonData", () => {
       variables: mockParams,
       headers: expectedHeaders,
     });
+    expect(consoleMock).toHaveBeenCalledWith(
+      `[getMatchedPersonData]: Failed to check for member match with CorrelationID [${mockCorrelationID}] | Error: Query failed | Session: - | CRM: -`,
+    );
   });
 });

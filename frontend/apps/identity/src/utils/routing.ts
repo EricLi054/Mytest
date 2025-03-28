@@ -1,6 +1,6 @@
 export type RegistrationPage = {
   formPage: `/${"" | "match" | "link-member"}`;
-  errorPage: `/${"system-unavailable" | "session-timeout" | "cant-find-you" | "lapsed-membership"}`;
+  errorPage: `/${"system-unavailable" | "session-timeout" | "cant-find-you" | "lapsed-membership" | "already-matched"}`;
 };
 
 export const getRegistrationPageUrl = ({ page }: { page: RegistrationPage["formPage"] }) =>

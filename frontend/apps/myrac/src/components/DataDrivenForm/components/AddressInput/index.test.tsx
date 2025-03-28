@@ -4,7 +4,7 @@ import { testHelper } from "#utils/testHelper";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestFormRenderer } from "../../testHelper";
-import { searchAddress } from "./util";
+import { searchAddress, validateSelectedAddress } from "./util";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation");
@@ -56,7 +56,7 @@ describe("Address Input Component", () => {
   });
 
   it("should show notFoundMessage", async () => {
-    vi.mocked(searchAddress).mockReturnValueOnce(Promise.resolve({ options: [], error: false }));
+    vi.mocked(searchAddress).mockResolvedValueOnce({ options: [], error: false });
     render(<TestFormRenderer fields={testNoInitialValueSchema} />);
 
     const input = screen.getByRole("combobox");
@@ -67,7 +67,7 @@ describe("Address Input Component", () => {
   });
 
   it("should show apiErrorMessage", async () => {
-    vi.mocked(searchAddress).mockReturnValueOnce(Promise.resolve({ options: [], error: true }));
+    vi.mocked(searchAddress).mockResolvedValueOnce({ options: [], error: true });
     render(<TestFormRenderer fields={testNoInitialValueSchema} />);
 
     const input = screen.getByRole("combobox");
@@ -75,5 +75,55 @@ describe("Address Input Component", () => {
     await userEvent.type(input, "123 test");
 
     await waitFor(() => expect(screen.getByText("apiErrorMessage")).toBeVisible());
+  });
+
+  it("should show list of options", async () => {
+    const options = [
+      { value: "Address Value 1", label: "Address Label 1" },
+      { value: "Address Value 2", label: "Address Label 2" },
+    ];
+    vi.mocked(searchAddress).mockResolvedValueOnce({ options, error: false });
+    render(<TestFormRenderer fields={testNoInitialValueSchema} />);
+
+    const input = screen.getByRole("combobox");
+
+    await userEvent.type(input, "Address");
+
+    await waitFor(() => expect(screen.getByRole("listbox")).toBeVisible());
+
+    expect(screen.getByRole("option", { name: "Address Label 1" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "Address Label 2" })).toBeVisible();
+  });
+
+  it("should should validate selected address", async () => {
+    const options = [
+      { value: "Address Value 1", label: "Address Label 1" },
+      { value: "Address Value 2", label: "Address Label 2" },
+    ];
+    vi.mocked(searchAddress).mockResolvedValueOnce({ options, error: false });
+    vi.mocked(validateSelectedAddress).mockResolvedValueOnce({
+      dpid: "123",
+      houseNumber: "1",
+      streetName: "Test St",
+      suburb: "Suburb",
+      state: "WA",
+      postcode: "6000",
+      country: "AUSTRALIA",
+    });
+    render(<TestFormRenderer fields={testNoInitialValueSchema} />);
+
+    const input = screen.getByRole("combobox");
+
+    await userEvent.type(input, "Address");
+
+    await waitFor(() => expect(screen.getByRole("listbox")).toBeVisible());
+
+    await testHelper.clickText("Address Label 1", screen);
+
+    expect(validateSelectedAddress).toHaveBeenCalledWith({ value: "Address Value 1", label: "Address Label 1" });
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+
+    expect(input).toHaveValue("Address Label 1");
   });
 });

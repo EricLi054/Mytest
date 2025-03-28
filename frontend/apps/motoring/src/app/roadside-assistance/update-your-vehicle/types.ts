@@ -1,7 +1,7 @@
 import type { DeepPick, PickFromQuery } from "@racwa/types";
 
 import type { getVehicleDetailsByRego } from "./(form)/update-vehicle/data";
-import type { getRoadsideProductData } from "./session/data";
+import type { getRoadsideProductData } from "./(preform)/data";
 
 export type RoadsideProduct = PickFromQuery<typeof getRoadsideProductData, "me.roadsideProduct">;
 

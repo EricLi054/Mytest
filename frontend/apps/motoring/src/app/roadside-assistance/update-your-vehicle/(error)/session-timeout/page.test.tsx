@@ -4,15 +4,15 @@ import { clientEnv } from "#env/client";
 import { expectGtmCustomEvent } from "#testing/analytics";
 import { describe, expect, it, vi } from "vitest";
 
-import { deleteSessionCookie } from "../../session/actions";
+import { deleteSessionCookie } from "./actions";
 import SessionTimeout from "./page";
 
-vi.mock("../../session/actions.ts");
+vi.mock("./actions");
 vi.mock("server-only", () => ({}));
 
 const searchParams = { previousPage: undefined };
 
-describe("SessionTimeout", () => {
+describe("SessionTimeoutPage", () => {
   it("should be able to render", async () => {
     render(await SessionTimeout({ searchParams: new Promise((resolve) => resolve(searchParams)) }));
 

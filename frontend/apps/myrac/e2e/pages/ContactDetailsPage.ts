@@ -93,16 +93,18 @@ export class ContactDetailsPage {
 
   async clickRandomEditButton(): Promise<void> {
     const buttons = [this.nameSection.editButton, this.contactSection.editButton, this.loginSection.editButton];
+
     const randomIndex = Math.floor(Math.random() * buttons.length);
-    if (buttons[randomIndex]) {
-      await buttons[randomIndex].click();
-    } else {
-      throw new Error("No button found to click.");
+    const selectedButton = buttons.at(randomIndex);
+
+    if (!selectedButton) {
+      throw new Error("No button selected");
     }
+    await selectedButton.click();
   }
 
   async verifyMFAModal() {
-    await expect(this.mfaElements.modalTitle).toHaveText("Let’s verify it’s you");
+    await expect(this.mfaElements.modalTitle).toHaveText("Let's verify it's you");
     await expect(this.mfaElements.faqMessage).toBeVisible();
     await expect(this.mfaElements.helpCenterMessage).toBeVisible();
     await MFAHelper.verifyOTP(this.page);

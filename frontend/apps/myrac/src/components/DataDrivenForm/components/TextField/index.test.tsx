@@ -1,3 +1,4 @@
+import type { Field } from "@data-driven-forms/react-form-renderer";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TestFormRenderer } from "#components/DataDrivenForm/testHelper";
@@ -26,6 +27,8 @@ const testSchema = [
   },
 ];
 
+const testSchemaDisabled = [{ ...testSchema[0], disabled: true } as Field];
+
 describe("Text Field", () => {
   it("should render control with initial value", () => {
     render(<TestFormRenderer fields={testSchema} />);
@@ -34,6 +37,7 @@ describe("Text Field", () => {
 
     expect(textbox).toHaveValue("John");
     expect(textbox).toHaveAttribute("placeholder", "e.g. John");
+    expect(textbox).not.toBeDisabled();
   });
 
   it("should display error message when in an error state", async () => {
@@ -51,5 +55,14 @@ describe("Text Field", () => {
     await testHelper.clickButton("show tooltip", screen);
 
     await waitFor(() => expect(screen.getByText("Test tooltip")).toBeVisible());
+  });
+
+  it("should display disabled state", () => {
+    render(<TestFormRenderer fields={testSchemaDisabled} />);
+
+    const textbox = screen.getByRole("textbox");
+
+    expect(textbox).toHaveValue("John");
+    expect(textbox).toBeDisabled();
   });
 });

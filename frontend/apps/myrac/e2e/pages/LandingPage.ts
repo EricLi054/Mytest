@@ -117,22 +117,24 @@ export class LandingPage {
     }
   }
 
-  private async getDigitalCardInitial(): Promise<any> {
-    return await this.page.evaluate(() => {
+  private async getDigitalCardInitial(): Promise<{ count: number } | null> {
+    return await this.page.evaluate((): { count: number } | null => {
       const storedData = localStorage.getItem("digital-card-initial");
-      return storedData ? JSON.parse(storedData) : null;
+      return storedData ? (JSON.parse(storedData) as { count: number }) : null;
     });
   }
 
   private async clearDigitalCardInitial(): Promise<void> {
-    await this.page.evaluate(() => {
+    await this.page.evaluate((): void => {
       localStorage.removeItem("digital-card-initial");
     });
   }
 
   private async verifyDigitalCardInitialState(): Promise<void> {
     const digitalCardInitial = await this.getDigitalCardInitial();
-    expect(digitalCardInitial).not.toBeNull();
+    if (!digitalCardInitial) {
+      throw new Error("Digital card initial state is null");
+    }
     expect(digitalCardInitial.count).toBe(1);
     await expect(this.cardElements.addCardTooltip).not.toBeVisible();
   }
@@ -169,7 +171,6 @@ export class LandingPage {
     const viewport = this.page.viewportSize();
     const isMobile = viewport ? viewport.width < 768 : false;
 
-    // await expect(this.headerElements.myRACText).toHaveText('myRAC');
     await expect(this.headerElements.welcomeText).toBeVisible();
     await this.membershipElements.copyButton.click();
     await expect(this.membershipElements.copiedText).toBeVisible();

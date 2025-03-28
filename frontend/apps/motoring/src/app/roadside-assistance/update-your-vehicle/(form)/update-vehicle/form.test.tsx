@@ -1,8 +1,10 @@
 import type { Mock } from "vitest";
+import { useActionState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { mockUpdateVehicleContentfulData } from "#mocks/mockContentful";
-import { describe, expect, it, vi } from "vitest";
+import { mockUpdateVehicleContentfulData } from "#mocks/contentful";
+import { useFormStatus } from "react-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UpdateVehicleFormProps } from "./form";
 import { getVehicleByRego } from "./actions";
@@ -10,15 +12,11 @@ import UpdateVehicleForm from "./form";
 
 vi.mock("server-only", () => ({}));
 
-vi.mock("./actions", () => ({
-  getVehicleByRego: vi.fn(),
-}));
-
 vi.mock("react-dom", async () => {
   const actual = await vi.importActual("react-dom");
   return {
     ...actual,
-    useFormStatus: vi.fn().mockReturnValue({ pending: false }),
+    useFormStatus: vi.fn(),
   };
 });
 
@@ -26,9 +24,13 @@ vi.mock("react", async () => {
   const actual = await vi.importActual("react");
   return {
     ...actual,
-    useActionState: vi.fn().mockReturnValue([{}, vi.fn(), false]),
+    useActionState: vi.fn(),
   };
 });
+
+vi.mock("./actions", () => ({
+  getVehicleByRego: vi.fn(),
+}));
 
 const mockGetVehicleByRego = getVehicleByRego as Mock;
 
@@ -39,6 +41,11 @@ const mockProps: UpdateVehicleFormProps = {
 };
 
 describe("UpdateVehicleForm", () => {
+  beforeEach(() => {
+    vi.mocked(useActionState).mockReturnValue([{}, vi.fn(), false]);
+    vi.mocked(useFormStatus).mockReturnValue({ pending: false, data: null, method: null, action: null });
+  });
+
   it("should render with form fields", () => {
     render(<UpdateVehicleForm {...mockProps} />);
 

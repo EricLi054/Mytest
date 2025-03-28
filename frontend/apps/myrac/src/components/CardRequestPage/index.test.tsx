@@ -95,7 +95,7 @@ describe("CardRequestForm", () => {
     const button = screen.getByRole("button", { name: "Request card" });
     await userEvent.click(button);
 
-    expect(pushMock).toHaveBeenCalledWith("/error");
+    expect(pushMock).toHaveBeenCalledWith("/something-went-wrong");
   });
 
   it("should navigate to duplicate-card-error page when submitting a duplicate request", async () => {

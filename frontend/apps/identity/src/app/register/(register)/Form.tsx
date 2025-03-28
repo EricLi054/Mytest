@@ -98,7 +98,7 @@ export default function RegisterForm({ formAction }: RegisterFormProps) {
                 <Typography style={{ fontSize: "14px", fontWeight: "400" }}>
                   I accept the{" "}
                   <Link
-                    href={process.env.NEXT_PUBLIC_RAC_TERMS_URL}
+                    href={process.env.NEXT_PUBLIC_RAC_ABOUT_TERMS_URL}
                     rel="noopener noreferrer"
                     target="_blank"
                     style={{

@@ -51,13 +51,13 @@ const CardRequestForm: React.FC<CardRequestFormProps> = ({ unmaskedFormattedAddr
       }
 
       if (isGenericError(result)) {
-        router.push(errorPages.unhandledError);
+        router.push(errorPages.somethingWentWrong);
         return;
       }
 
       router.push(cardRequestSuccessUrl);
     } catch {
-      router.push(errorPages.unhandledError);
+      router.push(errorPages.somethingWentWrong);
     }
   };
 

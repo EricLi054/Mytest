@@ -5,6 +5,8 @@ import { mockFormAction } from "#testing";
 import { expectGtmCustomEvent, expectGtmFieldTouched } from "#testing/analytics";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useMfaModalDialog } from "@racwa/mfa";
+
 import type { IdentificationMethodValue, Person, PersonMatchError } from "./types";
 import MatchForm from "./Form";
 import { MfaModalDialogProvider } from "./providers/mfa";
@@ -37,18 +39,15 @@ vi.mock("next/navigation", () => ({
 }));
 
 const openMfaModalMock = vi.fn();
-const setCustomLoadingMessageMock = vi.fn();
 vi.mock("@racwa/mfa", async () => {
   const actual = await vi.importActual("@racwa/mfa");
   return {
     ...actual,
-    useMfaModalDialog: () => ({
-      openMfaModal: openMfaModalMock,
-      closeMfaModal: vi.fn(),
-      setCustomLoadingMessage: setCustomLoadingMessageMock,
-    }),
+    useMfaModalDialog: vi.fn(),
   };
 });
+
+const getPersonMock = vi.fn();
 
 const validFirstName = "John";
 const validLastName = "Smith";
@@ -59,31 +58,18 @@ const requiredErrorMessage = "This field is required";
 const validMobileNumber = "0412345678";
 const validMembershipNumber = "01-248815-4";
 
-const getPersonMock = vi.fn();
-
 const mockMatchedPerson: Person = {
   personId: "00000000-0000-0000-0000-00000000000",
   racId: "00000001",
   firstName: "John",
   mobilePhone: "0400000000",
   membershipType: "Member",
-  otpVerificationDetails: {
-    sessionKey: "my-rac-account-registration-123456789-987654321",
-    isAuthenticated: false,
-    isMobile: true,
-    phoneNumberSuffix: "000",
-  },
 };
 
 const renderForm = () =>
   render(
-    <MfaModalDialogProvider
-      getPerson={getPersonMock}
-      checkOtp={vi.fn()}
-      checkAndSendOtp={vi.fn()}
-      checkAndVerifyOtp={vi.fn()}
-    >
-      <MatchForm formAction={mockFormAction} />
+    <MfaModalDialogProvider getVerificationDetailsAction={vi.fn()} sendOtpAction={vi.fn()} verifyOtpAction={vi.fn()}>
+      <MatchForm reCaptchaSiteKey="token" formAction={mockFormAction} />
     </MfaModalDialogProvider>,
   );
 
@@ -109,6 +95,12 @@ describe("MatchForm", () => {
   beforeEach(() => {
     vi.mocked(useActionState).mockReturnValue([{}, vi.fn(), false]);
     getPersonMock.mockResolvedValue(mockMatchedPerson);
+    vi.mocked(useMfaModalDialog).mockReturnValue({
+      openMfaModal: openMfaModalMock,
+      closeMfaModal: vi.fn(),
+      mfaOnErrorTriggered: false,
+      mfaOnSuccessTriggered: false,
+    });
   });
 
   describe("Render", () => {
@@ -226,15 +218,32 @@ describe("MatchForm", () => {
       expect(screen.queryByText("Please enter", { exact: false })).not.toBeInTheDocument();
     };
 
-    it("should render with submitting loading modal when isPending is true", () => {
-      vi.mocked(useActionState).mockReturnValueOnce([{}, vi.fn(), true]);
-      renderForm();
-
-      expect(screen.getByText("Submitting")).toBeVisible();
-    });
-
     it("should render with disabled submit button when isPending is true", () => {
       vi.mocked(useActionState).mockReturnValue([{}, vi.fn(), true]);
+      renderForm();
+
+      expect(getSubmitButton()).toBeDisabled();
+    });
+
+    it("should render with disabled submit button when mfaOnSuccessTriggered is true", () => {
+      vi.mocked(useMfaModalDialog).mockReturnValue({
+        openMfaModal: openMfaModalMock,
+        closeMfaModal: vi.fn(),
+        mfaOnErrorTriggered: false,
+        mfaOnSuccessTriggered: true,
+      });
+      renderForm();
+
+      expect(getSubmitButton()).toBeDisabled();
+    });
+
+    it("should render with disabled submit button when mfaOnErrorTriggered is true", () => {
+      vi.mocked(useMfaModalDialog).mockReturnValue({
+        openMfaModal: openMfaModalMock,
+        closeMfaModal: vi.fn(),
+        mfaOnErrorTriggered: true,
+        mfaOnSuccessTriggered: false,
+      });
       renderForm();
 
       expect(getSubmitButton()).toBeDisabled();
@@ -632,6 +641,39 @@ describe("MatchForm", () => {
           expectRequiredFieldErrors();
         });
       });
+    });
+  });
+
+  describe("LoadingModals", () => {
+    it("should render with 'Submitting' loading modal when isPending is true", () => {
+      vi.mocked(useActionState).mockReturnValueOnce([{}, vi.fn(), true]);
+      renderForm();
+
+      expect(screen.getByText("Submitting")).toBeVisible();
+    });
+
+    it("should display 'Weve verified you!' loading modal when mfaOnSuccessTriggered is true", () => {
+      vi.mocked(useMfaModalDialog).mockReturnValue({
+        openMfaModal: openMfaModalMock,
+        closeMfaModal: vi.fn(),
+        mfaOnErrorTriggered: false,
+        mfaOnSuccessTriggered: true,
+      });
+      renderForm();
+
+      expect(screen.getByText("We've verified you!")).toBeVisible();
+    });
+
+    it("should display 'Something went wrong' loading modal when mfaOnErrorTriggered is true", () => {
+      vi.mocked(useMfaModalDialog).mockReturnValue({
+        openMfaModal: openMfaModalMock,
+        closeMfaModal: vi.fn(),
+        mfaOnErrorTriggered: true,
+        mfaOnSuccessTriggered: false,
+      });
+      renderForm();
+
+      expect(screen.getByText("Something went wrong")).toBeVisible();
     });
   });
 

@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 import type { UserType } from "../fixtures/credentials";
-import { memberCredentials, specialCredentials, testCredentials } from "../fixtures/credentials";
+import { getCredentials } from "../fixtures/credentials";
 import { getBaseUrl } from "../playwright-helpers/urls";
 
 export class LoginPage {
@@ -24,7 +24,7 @@ export class LoginPage {
     };
   }
 
-  async goto(): Promise<void> {
+  async gotoSignIn(): Promise<void> {
     const baseUrl = getBaseUrl();
     await this.page.goto(baseUrl);
     await this.page.waitForURL(/.*b2c_1a_signuporsignin.*/);
@@ -46,28 +46,16 @@ export class LoginPage {
   }
 
   async login(): Promise<void> {
-    await this.performLogin(testCredentials.default);
+    await this.performLogin(getCredentials("DEFAULT_USER"));
   }
 
   async loginAs(userType: UserType): Promise<void> {
-    await this.goto();
+    await this.gotoSignIn();
     await this.verifyLoginPageElements();
-    await this.performLogin(testCredentials[userType.toLowerCase() as keyof typeof testCredentials]);
-  }
-
-  async loginAsMember(memberType: keyof typeof memberCredentials): Promise<void> {
-    await this.performLogin(memberCredentials[memberType]);
+    await this.performLogin(getCredentials(userType));
   }
 
   async loginForDigitalCard(): Promise<void> {
-    await this.performLogin(specialCredentials.digitalCard);
-  }
-
-  async loginWithActiveDigitalCard(): Promise<void> {
-    await this.performLogin(specialCredentials.activeDigitalCard);
-  }
-
-  async loginForDigitalCardUAT(): Promise<void> {
-    await this.performLogin(specialCredentials.cardUAT);
+    await this.performLogin(getCredentials("DIGITAL_CARD"));
   }
 }
