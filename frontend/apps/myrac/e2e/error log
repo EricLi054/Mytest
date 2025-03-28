@@ -1,0 +1,51 @@
+pnpm test:e2e:sit
+PS C:\Users\ll12668\rac-digital\frontend\apps\myrac> pnpm test:e2e:sit
+
+> @racwa/myrac@0.1.0 test:e2e:sit C:\Users\ll12668\rac-digital\frontend\apps\myrac
+> set CONTAINER_APP_ENV=sit && playwright test --headed --config=e2e
+
+(node:19236) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+(node:14328) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Global Setup] › e2e\global.setup.ts:7:1 › Global Setup
+[setupAutomationEnvironment]: Fetching automation secrets...
+[setupAutomationEnvironment]: Took 2.573s
+(node:28868) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Random test with - Desktop Chrome] › e2e\tests\auth.spec.ts:6:3 › Authentication › should login successfully
+{
+  success: false,
+  error: '[getKeyvaultSecret]: Error: [RestError: A secret with (name/id) myrac-username was not found in this key vault. If you recently deleted this secret you may be able to
+ recover it using the correct recovery command. For help resolving this issue, please see https://go.microsoft.com/fwlink/?linkid=2125182]'                                     } {
+  success: false,
+  error: '[getKeyvaultSecret]: Error: [RestError: A secret with (name/id) myrac-password was not found in this key vault. If you recently deleted this secret you may be able to
+ recover it using the correct recovery command. For help resolving this issue, please see https://go.microsoft.com/fwlink/?linkid=2125182]'                                     }
+  1) [Random test with - Desktop Chrome] › e2e\tests\auth.spec.ts:6:3 › Authentication › should login successfully
+
+    Error: Unable to retrieve credentials from Key Vault
+
+       at pages\auth.page.ts:40
+
+      38 |     if (!usernameResult.success || !passwordResult.success) {
+      39 |       console.log(usernameResult, passwordResult);
+    > 40 |       throw new Error("Unable to retrieve credentials from Key Vault");
+         |             ^
+      41 |     }
+      42 |
+      43 |     return {
+        at AuthPage.getCredentialsFromKeyVault (C:\Users\ll12668\rac-digital\frontend\apps\myrac\e2e\pages\auth.page.ts:40:13)
+        at AuthPage.login (C:\Users\ll12668\rac-digital\frontend\apps\myrac\e2e\pages\auth.page.ts:15:27)
+        at C:\Users\ll12668\rac-digital\frontend\apps\myrac\e2e\tests\auth.spec.ts:8:5
+
+  1 failed
+    [Random test with - Desktop Chrome] › e2e\tests\auth.spec.ts:6:3 › Authentication › should login successfully 
+  1 passed (14.3s)
+
+To open last HTML report run:
+
+  pnpm exec playwright show-report
+
+ ELIFECYCLE  Command failed with exit code 1.
