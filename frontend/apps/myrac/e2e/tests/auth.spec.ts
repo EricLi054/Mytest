@@ -1,19 +1,10 @@
-import { expect, test } from "@playwright/test";
-
-import { createAuthPage } from "../pages/auth.page";
+import { expect } from "@playwright/test";
+import { logIntoMyRac } from "@racwa/automation";
+import { test } from "../fixtures";
 
 test.describe("Authentication", () => {
-  test("should login successfully", async ({ page }) => {
-    const authPage = createAuthPage(page);
-    await authPage.login();
-
-    await expect(page).toHaveURL(/.*\/myrac/);
-  });
-
-  test("should login successfully with custom credentials", async ({ page }) => {
-    const authPage = createAuthPage(page);
-    await authPage.login("CUSTOM_USER", "CUSTOM_PASSWORD");
-
+  test("should login successfully", async ({ page, account }) => {
+    await logIntoMyRac({ account, page });
     await expect(page).toHaveURL(/.*\/myrac/);
   });
 });

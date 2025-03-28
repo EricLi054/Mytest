@@ -8,8 +8,6 @@ type Fixtures = {
 };
 
 export const test = base.extend<Fixtures>({
-  // Playwright requires a destructuring here
-  // eslint-disable-next-line no-empty-pattern
   account: async ({}, use) => {
     const log = (message: string) => console.log(`[account (Fixture)]: ${message}`);
 
@@ -23,7 +21,7 @@ export const test = base.extend<Fixtures>({
     const randomId = crypto.randomUUID().replaceAll("-", "");
 
     const account = {
-      email: `motoring-e2e-${randomId}@ytrlm97h.mailosaur.net`,
+      email: `myrac-e2e-${randomId}@ytrlm97h.mailosaur.net`,
       password: passwordResult.secret,
     } as const satisfies MyRacAccount;
 
@@ -42,7 +40,6 @@ export const test = base.extend<Fixtures>({
 
     log(`Created new account with email [${account.email}]`);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(account);
 
     const deleteAccountResult = await deleteAccount(account);
