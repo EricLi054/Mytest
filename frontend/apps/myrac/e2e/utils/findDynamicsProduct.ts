@@ -1,21 +1,34 @@
 import { Dynamics, DynamicsProductHoldingEntity, queryDynamics, secondsTaken } from "@racwa/automation";
 
 type FindDynamicsProductArgs = {
-  productStatus: keyof typeof Dynamics.ProductStatus;
-  productType: keyof typeof Dynamics.ProductType;
+  productStatus?: keyof typeof Dynamics.ProductStatus;
+  productType?: keyof typeof Dynamics.ProductType;
 };
 
 const log = (message: string) => console.log(`[findDynamicsProduct]: ${message}`);
 
-export const findDynamicsProduct = async ({ productStatus, productType }: FindDynamicsProductArgs) => {
+// 辅助函数：从对象的键中随机选择一个
+function getRandomKey<T extends object>(obj: T): keyof T {
+  const keys = Object.keys(obj) as Array<keyof T>;
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
+export const findDynamicsProduct = async ({ 
+  productStatus, 
+  productType 
+}: FindDynamicsProductArgs = {}) => {
   const start = performance.now();
 
-  log(`Querying Dynamics for product type [${productType}] with status [${productStatus}]...`);
+  // 如果未提供，则随机选择状态和类型
+  const selectedStatus = productStatus || getRandomKey(Dynamics.ProductStatus);
+  const selectedType = productType || getRandomKey(Dynamics.ProductType);
+
+  log(`Querying Dynamics for product type [${selectedType}] with status [${selectedStatus}]...`);
 
   const queryResult = await queryDynamics({
     entity: DynamicsProductHoldingEntity,
     query:
-      `$filter=(statuscode eq ${Dynamics.ProductStatus[`${productStatus}`]} and contains(rac_name, '${Dynamics.ProductType[`${productType}`]}'))` +
+      `$filter=(statuscode eq ${Dynamics.ProductStatus[selectedStatus]} and contains(rac_name, '${Dynamics.ProductType[selectedType]}'))` +
       "&" +
       "$top=1",
   });
@@ -29,7 +42,7 @@ export const findDynamicsProduct = async ({ productStatus, productType }: FindDy
   const product = entities[0];
 
   if (!product) {
-    throw new Error("Failed to find product");
+    throw new Error(`Failed to find product with status [${selectedStatus}] and type [${selectedType}]`);
   }
 
   log(
